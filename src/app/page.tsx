@@ -5,33 +5,75 @@ import { DigitalTwinCanvas } from '../components/DigitalTwinCanvas';
 import { TelemetryPanel } from '../components/TelemetryPanel';
 import { useMqttTelemetry } from '../hooks/useMqttTelemetry';
 import { availableModels } from '../components/ModelSelector';
+import { TopBar } from '../components/TopBar';
+import { StatusBar } from '../components/StatusBar';
+import { DeviceSidebar } from '../components/DeviceSidebar';
 
 export default function Dashboard() {
-  const { data, status, simulated, setSimulated, forceFault, setForceFault } = useMqttTelemetry();
-  const [activeModelId, setActiveModelId] = useState<string>(availableModels[0].id);
+  const { deviceData, status, simulated, setSimulated, forceFault, setForceFault, lastUpdated } = useMqttTelemetry();
   
-  const activeModelUrl = availableModels.find(m => m.id === activeModelId)?.url || availableModels[0].url;
+  // State for which device is selected in the sidebar
+  const [activeDeviceId, setActiveDeviceId] = useState<string>('device-1');
+  
+  // State for which 3D model is active for the current device view
+  const [activeModelId, setActiveModelId] = useState<string>(availableModels[0].id);
+  const [activeCustomUrl, setActiveCustomUrl] = useState<string>('');
+  
+  const handleModelSelect = (id: string, url?: string) => {
+    setActiveModelId(id);
+    if (url) {
+      setActiveCustomUrl(url);
+    }
+  };
+
+  const activeModelUrl = activeModelId === 'custom-upload' 
+    ? activeCustomUrl 
+    : (availableModels.find(m => m.id === activeModelId)?.url || availableModels[0].url);
+
+  // Get the telemetry data for the currently selected device
+  const activeDeviceTelemetry = deviceData[activeDeviceId] || {
+    temp: 0, sound: 0, vibration: 0, anomaly_score: 0
+  };
 
   return (
-    <main className="flex flex-col md:flex-row w-screen h-screen bg-gray-950 text-slate-100 overflow-hidden">
-      {/* 3D Canvas Section (Left 2/3) */}
-      <section className="w-full md:w-2/3 h-[50vh] md:h-full relative">
-        <DigitalTwinCanvas anomalyScore={data.anomaly_score} modelUrl={activeModelUrl} />
-      </section>
+    <main className="flex flex-col w-screen h-screen bg-gray-950 text-slate-100 overflow-hidden">
+      
+      {/* 1. Top Navigation Bar */}
+      <TopBar />
 
-      {/* Telemetry Dashboard (Right 1/3) */}
-      <section className="w-full md:w-1/3 h-[50vh] md:h-full z-10 shadow-2xl">
-        <TelemetryPanel 
-          data={data} 
-          status={status} 
-          simulated={simulated}
-          setSimulated={setSimulated}
-          forceFault={forceFault}
-          setForceFault={setForceFault}
-          activeModelId={activeModelId}
-          onSelectModel={setActiveModelId}
+      <div className="flex flex-1 overflow-hidden">
+        
+        {/* 2. Left Sidebar (Device List) */}
+        <DeviceSidebar 
+          deviceData={deviceData} 
+          activeDeviceId={activeDeviceId} 
+          onSelectDevice={setActiveDeviceId} 
         />
-      </section>
+
+        {/* 3. Main 3D Canvas (Center) */}
+        <section className="flex-1 relative">
+          <DigitalTwinCanvas anomalyScore={activeDeviceTelemetry.anomaly_score} modelUrl={activeModelUrl} />
+        </section>
+
+        {/* 4. Telemetry Dashboard (Right Sidebar) */}
+        <section className="w-[350px] h-full z-10 shadow-2xl bg-slate-900/50">
+          <TelemetryPanel 
+            data={activeDeviceTelemetry} 
+            status={status} 
+            simulated={simulated}
+            setSimulated={setSimulated}
+            forceFault={forceFault === activeDeviceId}
+            setForceFault={(val) => setForceFault(val ? activeDeviceId : null)}
+            activeModelId={activeModelId}
+            onSelectModel={handleModelSelect}
+          />
+        </section>
+        
+      </div>
+
+      {/* 5. Bottom Status Bar */}
+      <StatusBar status={status} lastUpdated={lastUpdated} />
+
     </main>
   );
 }

@@ -1,13 +1,50 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, Component, ErrorInfo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Environment, ContactShadows, Text } from '@react-three/drei';
 import { MachineModel } from './MachineModel';
 
 interface DigitalTwinCanvasProps {
   anomalyScore: number;
   modelUrl: string;
+}
+
+class ModelErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Failed to load 3D Model:", error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: any) {
+    // If the child props change (e.g. they uploaded a new model), reset error state
+    if (this.props.children !== prevProps.children && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <mesh>
+          <boxGeometry args={[2, 2, 2]} />
+          <meshStandardMaterial color="#ff3333" wireframe />
+          <Text position={[0, 1.5, 0]} color="white" fontSize={0.2}>
+            Invalid Model Format
+          </Text>
+        </mesh>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ anomalyScore, modelUrl }) => {
@@ -21,7 +58,10 @@ export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ anomalySco
         <pointLight position={[-10, -10, -10]} intensity={0.5} />
         
         <Suspense fallback={<Loader />}>
-          <MachineModel anomalyScore={anomalyScore} modelUrl={modelUrl} />
+          <ModelErrorBoundary>
+            {/* The MachineModel is wrapped in the error boundary so if useGLTF fails, we catch it */}
+            <MachineModel key={modelUrl} anomalyScore={anomalyScore} modelUrl={modelUrl} />
+          </ModelErrorBoundary>
           <Environment preset="city" />
           <ContactShadows position={[0, -1.5, 0]} opacity={0.4} scale={10} blur={2} far={4} />
         </Suspense>
@@ -50,6 +90,9 @@ function Loader() {
     <mesh>
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial color="#445566" wireframe />
+      <Text position={[0, 1, 0]} color="white" fontSize={0.2}>
+        Loading Asset...
+      </Text>
     </mesh>
   );
 }
