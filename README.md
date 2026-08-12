@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
+  <h1>🛡️ SentinelEdge</h1>
+  <p><strong>Predictive Maintenance Edge-AI Pod & Digital Twin Dashboard</strong></p>
+  <p><i>Built for the MSME Hackathon 6.0</i></p>
+</div>
 
-## Getting Started
+<br />
 
-First, run the development server:
+> **SentinelEdge** democratizes predictive maintenance for Micro, Small & Medium Enterprises (MSMEs). By combining a sub-$50 magnetic, snap-on Edge AI sensor pod with a real-time 3D Digital Twin dashboard, factories can instantly upgrade their legacy machinery into smart, predictive assets—without millions of dollars in enterprise contracts or expensive cloud telemetry costs.
+
+---
+
+## ✨ Key Features
+
+- **🧲 Snap-On Deployment:** The hardware pod mounts via N52 neodymium magnets to any industrial machine. Zero drilling, zero downtime, zero wiring.
+- **🤖 Edge AI (Blind Source Separation):** The pod performs Fast Fourier Transform (FFT) spectral analysis locally on the edge. It automatically discovers the mechanical components (bearings, gears, motors) hidden inside the machine without needing a manual manifest.
+- **📉 Predictive Maintenance:** Uses degradation tracking to calculate the Remaining Useful Life (RUL) of components. It generates prioritized, actionable work orders (e.g., "Replace gear set immediately") before catastrophic failure occurs.
+- **🔊 Spectral & Acoustic Fusion:** By fusing data from a high-frequency ADXL355 accelerometer and an I2S MEMS microphone, the AI filters out ambient factory noise and locks onto the fundamental RPM of the machine using **Order Tracking**.
+- **🌐 3D Digital Twin Dashboard:** A stunning, professional-grade Next.js web application utilizing React Three Fiber to render a live, interactive 3D model of the machine overlaid with real-time component health telemetry.
+
+---
+
+## 🛠️ The Hardware Blueprint (Under $50)
+
+Unlike legacy systems (Fluke, SKF) that cost thousands per node, SentinelEdge is built for MSMEs using accessible, powerful edge components:
+1. **ESP32-S3:** Dual-core MCU with vector instructions for running TinyML/TensorFlow Lite on the edge.
+2. **ADXL355 / ADXL1002:** Ultra-low noise, high-frequency (10kHz) vibration sensor required to detect microscopic bearing faults.
+3. **INMP441 (I2S MEMS Mic):** Digital acoustic sensor to capture high-frequency gear wear signatures.
+4. **MLX90614:** Non-contact IR thermal sensor.
+5. **N52 Magnetic Base:** For instant, secure mounting.
+
+---
+
+## 🚀 Getting Started (Software Dashboard)
+
+The software dashboard is built with Next.js, React Three Fiber, and TailwindCSS. It includes a built-in local simulation engine so judges can test the predictive algorithms without needing physical hardware connected.
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/Nishant17s/MSME_HACK-6.0.git
+cd MSME_HACK-6.0
+
+# Install dependencies
+npm install
+
+# Run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🧪 How to Demo (For Reviewers & Judges)
 
-## Learn More
+The dashboard includes a powerful **Dev Tools** simulation panel (located at the bottom of the right-hand telemetry panel). Use this to demonstrate the exact edge-cases you will face in a real factory:
 
-To learn more about Next.js, take a look at the following resources:
+1. **Auto-Calibration & Component Discovery:**
+   - Click "+ Register Pod Manually" on the bottom left.
+   - Watch the right panel enter a 15-second, 3-phase AI Calibration sequence (Environment Noise Profiling ➔ RPM Order Tracking ➔ Component Inference).
+   - Once complete, verify the discovered components.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Variable Machine RPM Handling:**
+   - Enable `Local Simulation` and toggle **`Variable Machine RPM`**.
+   - Navigate to the **Spectral** tab. You will see the FFT peaks dynamically shifting left and right as the machine speeds up and slows down. The anomaly score remains healthy, proving the algorithm uses dynamic *Order Tracking* rather than fixed frequency bands.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Tamper & Misalignment Detection:**
+   - Toggle **`Trigger Tamper Event`**.
+   - This simulates the magnetic pod being kicked or vibrating loose. 
+   - Instead of destroying the machine's component health predictions, the dashboard intelligently intercepts the massive G-shock and flags a critical `Pod Misalignment / Tamper Detected` alert, freezing the degradation curves.
 
-## Deploy on Vercel
+4. **Predictive Failure (Critical Fault):**
+   - Toggle **`Trigger Critical Fault`**.
+   - Watch the FFT chart instantly spike at bins 4-6 (simulating a high-frequency bearing defect). 
+   - Switch to the **Maintenance** tab to watch the Bearing and Gear health bars drain exponentially until the AI issues a `REPLACE NOW` work order.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 💻 Tech Stack
+- **Framework:** Next.js 14 (App Router), React 18
+- **Styling:** TailwindCSS, Lucide Icons
+- **3D Rendering:** Three.js, React Three Fiber (R3F), React Three Drei
+- **Data & IoT:** MQTT (simulated client)
+- **State Persistence:** LocalStorage (for custom pod configurations and 3D models)
+
+<br/>
+<div align="center">
+  <i>Built with ❤️ for MSME Hackathon 6.0</i>
+</div>
