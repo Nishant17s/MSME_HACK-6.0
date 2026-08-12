@@ -10,24 +10,38 @@ import { StatusBar } from '../components/StatusBar';
 import { DeviceSidebar } from '../components/DeviceSidebar';
 
 export default function Dashboard() {
-  const { deviceData, deviceNames, setDeviceName, status, simulated, setSimulated, forceFault, setForceFault, lastUpdated } = useMqttTelemetry();
+  const { 
+    deviceData, 
+    deviceNames, 
+    setDeviceName, 
+    powerStates,
+    toggleDevicePower,
+    status, 
+    simulated, 
+    setSimulated, 
+    forceFault, 
+    setForceFault, 
+    lastUpdated 
+  } = useMqttTelemetry();
   
   // State for which device is selected in the sidebar
   const [activeDeviceId, setActiveDeviceId] = useState<string>('device-1');
   
-  // State for which 3D model is active for the current device view
-  const [activeModelId, setActiveModelId] = useState<string>(availableModels[0].id);
-  const [activeCustomUrl, setActiveCustomUrl] = useState<string>('');
+  // State for which 3D model is active for each device
+  const [deviceModels, setDeviceModels] = useState<Record<string, { id: string, url?: string }>>({});
   
   const handleModelSelect = (id: string, url?: string) => {
-    setActiveModelId(id);
-    if (url) {
-      setActiveCustomUrl(url);
-    }
+    setDeviceModels(prev => ({
+      ...prev,
+      [activeDeviceId]: { id, url }
+    }));
   };
 
+  const currentModelSetting = deviceModels[activeDeviceId] || { id: availableModels[0].id };
+  const activeModelId = currentModelSetting.id;
+
   const activeModelUrl = activeModelId === 'custom-upload' 
-    ? activeCustomUrl 
+    ? currentModelSetting.url || ''
     : (availableModels.find(m => m.id === activeModelId)?.url || availableModels[0].url);
 
   // Get the telemetry data for the currently selected device
@@ -48,13 +62,18 @@ export default function Dashboard() {
           deviceData={deviceData} 
           deviceNames={deviceNames}
           setDeviceName={setDeviceName}
+          powerStates={powerStates}
           activeDeviceId={activeDeviceId} 
           onSelectDevice={setActiveDeviceId} 
         />
 
         {/* 3. Main 3D Canvas (Center) */}
         <section className="flex-1 w-full h-full relative z-0">
-          <DigitalTwinCanvas anomalyScore={activeDeviceTelemetry.anomaly_score} modelUrl={activeModelUrl} />
+          <DigitalTwinCanvas 
+            anomalyScore={activeDeviceTelemetry.anomaly_score} 
+            modelUrl={activeModelUrl} 
+            isPowered={powerStates[activeDeviceId] ?? true} 
+          />
         </section>
 
         {/* 4. Telemetry Dashboard (Right Sidebar) */}
@@ -68,6 +87,8 @@ export default function Dashboard() {
             setForceFault={(val) => setForceFault(val ? activeDeviceId : null)}
             activeModelId={activeModelId}
             onSelectModel={handleModelSelect}
+            isPowered={powerStates[activeDeviceId] ?? true}
+            onTogglePower={() => toggleDevicePower(activeDeviceId)}
           />
         </section>
         

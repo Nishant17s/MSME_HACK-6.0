@@ -13,6 +13,8 @@ interface TelemetryPanelProps {
   setForceFault: (val: boolean) => void;
   activeModelId: string;
   onSelectModel: (id: string) => void;
+  isPowered: boolean;
+  onTogglePower: () => void;
 }
 
 const MetricCard = ({ title, value, unit, icon, critical }: { title: string, value: string | number, unit: string, icon: React.ReactNode, critical?: boolean }) => (
@@ -43,8 +45,24 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   forceFault,
   setForceFault,
   activeModelId,
-  onSelectModel
+  onSelectModel,
+  isPowered,
+  onTogglePower
 }) => {
+  const getDiagnostics = () => {
+    if (!isPowered) return "System Offline - Power Cut";
+    if (data.anomaly_score < 50) return "All Systems Nominal";
+    const faults = [];
+    if (data.temp >= 75) faults.push("Motor Overheating");
+    if (data.sound >= 85) faults.push("Gear Wear Detected");
+    if (data.vibration >= 5) faults.push("Bearing Imbalance");
+    if (faults.length === 0 && data.anomaly_score >= 80) return "Unknown Critical Anomaly";
+    return faults.length > 0 ? faults.join(" • ") : "Minor Irregularities Detected";
+  };
+
+  const diagnosticsMsg = getDiagnostics();
+  const isCritical = data.anomaly_score >= 80;
+
   return (
     <div className="h-full w-full p-6 flex flex-col space-y-6 overflow-y-auto custom-scrollbar border-l border-slate-800/80 bg-slate-900/90 backdrop-blur-xl relative z-10">
       
@@ -53,9 +71,30 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           <h1 className="text-2xl font-bold text-slate-100">Telemetry Data</h1>
           <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">Live Feed</p>
         </div>
+        <button 
+          onClick={onTogglePower}
+          className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
+            isPowered 
+              ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30' 
+              : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+          }`}
+        >
+          {isPowered ? 'CUT POWER' : 'POWER ON'}
+        </button>
       </div>
 
       <ModelSelector activeModelId={activeModelId} onSelectModel={onSelectModel} />
+
+      {/* Diagnostics Panel */}
+      <div className={`p-4 rounded-xl border ${
+        !isPowered ? 'bg-slate-800/50 border-slate-700 text-slate-400' :
+        isCritical ? 'bg-red-950/40 border-red-500/50 text-red-400' : 
+        data.anomaly_score >= 50 ? 'bg-yellow-950/40 border-yellow-500/50 text-yellow-400' : 
+        'bg-emerald-950/40 border-emerald-500/50 text-emerald-400'
+      }`}>
+        <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">System Diagnostics</h3>
+        <p className="text-sm font-medium">{diagnosticsMsg}</p>
+      </div>
 
       <EStopBanner anomalyScore={data.anomaly_score} />
 

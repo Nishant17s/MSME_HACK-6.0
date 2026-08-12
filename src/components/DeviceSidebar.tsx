@@ -8,11 +8,12 @@ interface DeviceSidebarProps {
   deviceData: DeviceTelemetryMap;
   deviceNames: Record<string, string>;
   setDeviceName: (id: string, name: string) => void;
+  powerStates: Record<string, boolean>;
   activeDeviceId: string;
   onSelectDevice: (id: string) => void;
 }
 
-export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, deviceNames, setDeviceName, activeDeviceId, onSelectDevice }) => {
+export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, deviceNames, setDeviceName, powerStates, activeDeviceId, onSelectDevice }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -41,6 +42,7 @@ export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, device
         {Object.keys(deviceData).map((deviceId) => {
           const isCritical = deviceData[deviceId].anomaly_score >= 80;
           const isActive = activeDeviceId === deviceId;
+          const isPowered = powerStates[deviceId] ?? true;
           
           return (
             <button
@@ -77,13 +79,16 @@ export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, device
                       <span className={`font-semibold text-sm ${isActive ? 'text-blue-100' : 'text-slate-300 group-hover:text-white'}`}>
                         {deviceNames[deviceId] || deviceId.toUpperCase()}
                       </span>
+                      {/* Power Status Dot */}
+                      <span className={`w-2 h-2 rounded-full ${isPowered ? 'bg-emerald-500' : 'bg-slate-500'}`} title={isPowered ? 'Powered ON' : 'Powered OFF'}></span>
+                      
                       <button onClick={(e) => handleEdit(deviceId, e)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 transition-opacity">
                         <Edit2 className="w-3 h-3" />
                       </button>
                     </div>
                   )}
                   <span className="text-[10px] font-mono text-slate-500 mt-0.5">
-                    {isCritical ? 'CRITICAL STATE' : 'ONLINE'}
+                    {!isPowered ? 'SYSTEM OFF' : (isCritical ? 'CRITICAL STATE' : 'ONLINE')}
                   </span>
                 </div>
               </div>
