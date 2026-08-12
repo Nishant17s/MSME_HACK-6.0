@@ -18,6 +18,8 @@
 - **🔊 Spectral & Acoustic Fusion:** By fusing data from a high-frequency ADXL355 accelerometer and an I2S MEMS microphone, the AI filters out ambient factory noise and locks onto the fundamental RPM of the machine using **Order Tracking**.
 - **🌐 3D Digital Twin Dashboard:** A stunning, professional-grade Next.js web application utilizing React Three Fiber to render a live, interactive 3D model of the machine overlaid with real-time component health telemetry.
 
+👉 **[View the detailed Architecture & System Flowchart here](./ARCHITECTURE.md)**
+
 ---
 
 ## 🛠️ The Hardware Blueprint (Under $50)
