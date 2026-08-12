@@ -71,9 +71,13 @@ export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, device
                         onBlur={() => handleSave(deviceId)}
                         className="bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-sm font-semibold text-white w-24 outline-none focus:border-blue-500"
                       />
-                      <button onClick={(e) => handleSave(deviceId, e)} className="p-1 hover:bg-slate-700 rounded text-emerald-400">
+                      <div 
+                        onClick={(e) => handleSave(deviceId, e)} 
+                        className="p-1 hover:bg-slate-700 rounded text-emerald-400 cursor-pointer"
+                        role="button"
+                      >
                         <Check className="w-3 h-3" />
-                      </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-center space-x-2">
@@ -83,9 +87,13 @@ export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, device
                       {/* Power Status Dot */}
                       <span className={`w-2 h-2 rounded-full ${isPowered ? 'bg-emerald-500' : 'bg-slate-500'}`} title={isPowered ? 'Powered ON' : 'Powered OFF'}></span>
                       
-                      <button onClick={(e) => handleEdit(deviceId, e)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 transition-opacity">
+                      <div 
+                        onClick={(e) => handleEdit(deviceId, e)} 
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 transition-opacity cursor-pointer"
+                        role="button"
+                      >
                         <Edit2 className="w-3 h-3" />
-                      </button>
+                      </div>
                     </div>
                   )}
                   <span className="text-[10px] font-mono text-slate-500 mt-0.5">
