@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF, MeshWobbleMaterial, Bounds } from '@react-three/drei';
+import { useGLTF, Resize, Center } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface MachineModelProps {
@@ -15,9 +15,6 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelU
   const groupRef = useRef<THREE.Group>(null);
   const beaconRef = useRef<THREE.Mesh>(null);
   const lightRef = useRef<THREE.PointLight>(null);
-
-  // Clone the scene so we can reuse the same GLTF across unmounts/remounts easily without messing up the cache
-  const clonedScene = React.useMemo(() => scene.clone(), [scene]);
 
   useFrame((state) => {
     if (groupRef.current) {
@@ -46,31 +43,36 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelU
 
   return (
     <group ref={groupRef} dispose={null}>
-      <Bounds fit margin={1.5}>
-        <primitive object={clonedScene} />
-        
-        {/* Cool Siren Beacon for E-STOP */}
-        {isCritical && (
-          <group position={[0, 2, 0]}>
-            <pointLight ref={lightRef} color="#ff0000" distance={10} intensity={20} />
-            <mesh ref={beaconRef} position={[0, 0, 0]}>
-              <cylinderGeometry args={[0.2, 0.2, 0.3, 16]} />
-              <meshStandardMaterial 
-                color="#ff0000" 
-                emissive="#ff0000" 
-                emissiveIntensity={5} 
-                transparent 
-                opacity={0.9} 
-              />
-            </mesh>
-            {/* Base for the beacon */}
-            <mesh position={[0, -0.2, 0]}>
-              <cylinderGeometry args={[0.25, 0.25, 0.1, 16]} />
-              <meshStandardMaterial color="#333333" />
-            </mesh>
-          </group>
-        )}
-      </Bounds>
+      {/* 
+        Resize guarantees the model is exactly 3 units wide/tall/deep.
+        Center guarantees the model is perfectly centered at [0,0,0].
+        This replaces Bounds and prevents camera snapping or scale bugs with custom uploads. 
+      */}
+      <Center>
+        <Resize scale={3}>
+          <primitive object={scene} />
+        </Resize>
+      </Center>
+      
+      {/* Cool Siren Beacon for E-STOP positioned safely above the guaranteed 3-unit model */}
+      <group position={[0, 1.8, 0]} visible={isCritical}>
+        <pointLight ref={lightRef} color="#ff0000" distance={10} intensity={0} />
+        <mesh ref={beaconRef} position={[0, 0, 0]}>
+          <cylinderGeometry args={[0.2, 0.2, 0.3, 16]} />
+          <meshStandardMaterial 
+            color="#ff0000" 
+            emissive="#ff0000" 
+            emissiveIntensity={0} 
+            transparent 
+            opacity={0.9} 
+          />
+        </mesh>
+        {/* Base for the beacon */}
+        <mesh position={[0, -0.2, 0]}>
+          <cylinderGeometry args={[0.25, 0.25, 0.1, 16]} />
+          <meshStandardMaterial color="#333333" />
+        </mesh>
+      </group>
     </group>
   );
 };
