@@ -18,10 +18,10 @@ const generateInitialData = (): DeviceTelemetryMap => {
   const data: DeviceTelemetryMap = {};
   DEFAULT_DEVICES.forEach(id => {
     data[id] = {
-      temp: 20 + Math.random() * 5,
-      sound: 40 + Math.random() * 10,
-      vibration: 0.2 + Math.random() * 1,
-      anomaly_score: 5 + Math.random() * 10,
+      temp: 0,
+      sound: 0,
+      vibration: 0,
+      anomaly_score: 0,
     };
   });
   return data;
@@ -34,7 +34,7 @@ export const useMqttTelemetry = () => {
   const [forceFault, setForceFault] = useState<string | null>(null); // Which device is faulting
   
   // Expose global last updated for the status bar
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     if (simulated) {

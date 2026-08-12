@@ -16,14 +16,21 @@ interface TelemetryPanelProps {
 }
 
 const MetricCard = ({ title, value, unit, icon, critical }: { title: string, value: string | number, unit: string, icon: React.ReactNode, critical?: boolean }) => (
-  <div className={`p-4 rounded-xl border border-slate-700 bg-slate-800/50 backdrop-blur-md flex flex-col space-y-2 ${critical ? 'ring-2 ring-red-500 bg-red-900/20' : ''}`}>
-    <div className="flex justify-between items-center text-slate-400">
-      <span className="text-sm font-semibold uppercase tracking-wider">{title}</span>
-      {icon}
+  <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
+    critical 
+      ? 'bg-red-950/40 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' 
+      : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/60'
+  }`}>
+    {critical && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-rose-400" />}
+    <div className="flex items-center justify-between mb-3 text-slate-400">
+      <span className="text-xs font-bold tracking-widest uppercase">{title}</span>
+      <div className={critical ? 'text-red-400 animate-pulse' : 'text-slate-500'}>
+        {icon}
+      </div>
     </div>
-    <div className="flex items-baseline space-x-1">
-      <span className={`text-3xl font-bold ${critical ? 'text-red-400' : 'text-slate-100'}`}>{value}</span>
-      <span className="text-slate-500 font-medium">{unit}</span>
+    <div className="flex items-baseline space-x-1.5">
+      <span className={`text-4xl font-black tracking-tight ${critical ? 'text-red-400' : 'text-slate-100'}`}>{value}</span>
+      <span className="text-slate-500 font-medium text-sm">{unit}</span>
     </div>
   </div>
 );
@@ -39,15 +46,12 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   onSelectModel
 }) => {
   return (
-    <div className="h-full w-full p-6 flex flex-col space-y-6 overflow-y-auto custom-scrollbar border-l border-slate-800">
+    <div className="h-full w-full p-6 flex flex-col space-y-6 overflow-y-auto custom-scrollbar border-l border-slate-800/80 bg-slate-900/90 backdrop-blur-xl relative z-10">
       
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-          IoT Edge Pod
-        </h1>
-        <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
-          {status === 'Connected' ? <Wifi className="w-4 h-4 text-emerald-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
-          <span className="text-xs font-medium text-slate-300">{status}</span>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">Telemetry Data</h1>
+          <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">Live Feed</p>
         </div>
       </div>
 
