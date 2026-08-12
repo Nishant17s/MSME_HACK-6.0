@@ -15,6 +15,7 @@ interface TelemetryPanelProps {
   onSelectModel: (id: string, url?: string, name?: string) => void;
   isPowered: boolean;
   onTogglePower: () => void;
+  onRemoveDevice: () => void;
 }
 
 const MetricCard = ({ title, value, unit, icon, critical }: { title: string, value: string | number, unit: string, icon: React.ReactNode, critical?: boolean }) => (
@@ -47,7 +48,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   activeModelId,
   onSelectModel,
   isPowered,
-  onTogglePower
+  onTogglePower,
+  onRemoveDevice
 }) => {
   const getDiagnostics = () => {
     if (!isPowered) return "System Offline - Power Cut";
@@ -155,6 +157,16 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             </label>
           )}
         </div>
+      </div>
+      
+      {/* Danger Zone */}
+      <div className="mt-4">
+        <button 
+          onClick={onRemoveDevice}
+          className="w-full py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 bg-red-950/30 text-red-400 hover:bg-red-900/50 border border-red-900/50"
+        >
+          Remove Device
+        </button>
       </div>
       
     </div>

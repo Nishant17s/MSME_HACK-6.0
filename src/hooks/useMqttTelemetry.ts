@@ -149,16 +149,34 @@ export const useMqttTelemetry = () => {
     setPowerStates(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
   };
 
-  const addDevice = () => {
-    const existingCount = Object.keys(deviceData).length;
-    const newId = `device-${existingCount + 1}`;
+  const addDevice = (name: string) => {
+    const newId = `device-${Date.now()}`;
     
     setDeviceData(prev => ({
       ...prev,
-      [newId]: { temp: 0, sound: 0, vibration: 0, anomaly_score: 0 }
+      [newId]: { temp: 20, sound: 0, vibration: 0, anomaly_score: 0 }
     }));
-    setDeviceNames(prev => ({ ...prev, [newId]: newId.toUpperCase() }));
+    setDeviceNames(prev => ({ ...prev, [newId]: name }));
     setPowerStates(prev => ({ ...prev, [newId]: true }));
+    return newId;
+  };
+
+  const removeDevice = (id: string) => {
+    setDeviceData(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+    setDeviceNames(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+    setPowerStates(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
   };
 
   return { 
@@ -168,6 +186,7 @@ export const useMqttTelemetry = () => {
     powerStates,
     toggleDevicePower,
     addDevice,
+    removeDevice,
     status, 
     simulated, 
     setSimulated, 

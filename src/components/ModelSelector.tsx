@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Box, Upload } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface ModelOption {
   id: string;
@@ -23,16 +24,28 @@ interface ModelSelectorProps {
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onSelectModel }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCollapsed, setIsCollapsed] = useState(activeModelId === 'custom-upload');
+  
+  // Custom upload state
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [customMachineName, setCustomMachineName] = useState('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const suggestedName = file.name.replace(/\.(glb|gltf)$/i, '');
-      const machineName = window.prompt("Enter a name for this custom machine:", suggestedName);
-      
-      const objectUrl = URL.createObjectURL(file);
-      onSelectModel('custom-upload', objectUrl, machineName || suggestedName);
+      setPendingFile(file);
+      setCustomMachineName(file.name.replace(/\.(glb|gltf)$/i, ''));
+      setShowNameModal(true);
+    }
+  };
+
+  const confirmCustomUpload = () => {
+    if (pendingFile) {
+      const objectUrl = URL.createObjectURL(pendingFile);
+      onSelectModel('custom-upload', objectUrl, customMachineName);
       setIsCollapsed(true);
+      setShowNameModal(false);
+      setPendingFile(null);
     }
   };
 
@@ -88,6 +101,30 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onS
           />
         </div>
       )}
+
+      {/* Premium UI for Naming the Custom Upload */}
+      <Modal isOpen={showNameModal} onClose={() => setShowNameModal(false)} title="Name Custom Machine">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Machine Name</label>
+            <input 
+              type="text" 
+              value={customMachineName}
+              onChange={(e) => setCustomMachineName(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+              placeholder="e.g. Injection Molder"
+              autoFocus
+            />
+          </div>
+          <button 
+            onClick={confirmCustomUpload}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg py-2.5 transition-colors"
+          >
+            Confirm Upload
+          </button>
+        </div>
+      </Modal>
+
     </div>
   );
 };
