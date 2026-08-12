@@ -10,7 +10,7 @@ interface StatusBarProps {
 
 export const StatusBar: React.FC<StatusBarProps> = ({ status, lastUpdated }) => {
   return (
-    <footer className="w-full h-10 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-6 text-xs font-mono text-slate-400 z-20">
+    <footer className="w-full h-10 flex-shrink-0 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-6 text-xs font-mono text-slate-400 z-20">
       <div className="flex items-center space-x-6">
         <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-md border border-slate-800">
           {status === 'Connected' ? <Wifi className="w-3.5 h-3.5 text-emerald-500" /> : <WifiOff className="w-3.5 h-3.5 text-red-500" />}

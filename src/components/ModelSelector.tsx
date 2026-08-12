@@ -71,7 +71,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onS
           ref={fileInputRef} 
           onChange={handleFileUpload} 
           accept=".glb,.gltf" 
-          className="hidden" 
+          style={{ display: 'none' }}
         />
       </div>
     </div>

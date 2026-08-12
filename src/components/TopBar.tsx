@@ -13,7 +13,7 @@ export const TopBar: React.FC = () => {
   }, []);
 
   return (
-    <header className="w-full h-16 bg-slate-900/60 backdrop-blur-lg border-b border-slate-800/80 flex items-center justify-between px-8 z-20 shadow-sm">
+    <header className="w-full h-16 flex-shrink-0 bg-slate-900/60 backdrop-blur-lg border-b border-slate-800/80 flex items-center justify-between px-8 z-20 shadow-sm">
       <div className="flex items-center space-x-4">
         <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
           <Activity className="w-6 h-6 text-emerald-400" />
