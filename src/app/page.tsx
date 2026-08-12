@@ -39,6 +39,8 @@ export default function Dashboard() {
     setVariableRpm,
     tamperedPod,
     setTamperedPod,
+    multiPodMesh,
+    setMultiPodMesh,
   } = useMqttTelemetry();
 
   const {
@@ -213,6 +215,8 @@ export default function Dashboard() {
               setVariableRpm={setVariableRpm}
               tamperedPod={tamperedPod === activeDeviceId}
               setTamperedPod={(val) => setTamperedPod(val ? activeDeviceId : null)}
+              multiPodMesh={multiPodMesh}
+              setMultiPodMesh={setMultiPodMesh}
             />
           )}
         </section>

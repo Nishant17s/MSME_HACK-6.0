@@ -182,6 +182,7 @@ export const useMqttTelemetry = () => {
   // Phase 4 additions
   const [variableRpm, setVariableRpm] = useState(false);
   const [tamperedPod, setTamperedPod] = useState<string | null>(null);
+  const [multiPodMesh, setMultiPodMesh] = useState(false);
 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetryHistory>({});
@@ -444,9 +445,10 @@ export const useMqttTelemetry = () => {
     addDevice, removeDevice, status, simulated, setSimulated,
     forceFault, setForceFault, lastUpdated, telemetryHistory, reconnectAttempts,
     calibrationStates, discoveredComponents, verifyCalibration,
-    // Phase 4 exports
+    // Phase 4 & 5 exports
     calibrationProgress,
     variableRpm, setVariableRpm,
     tamperedPod, setTamperedPod,
+    multiPodMesh, setMultiPodMesh,
   };
 };

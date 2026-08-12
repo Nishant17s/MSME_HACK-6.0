@@ -6,7 +6,7 @@ import { TelemetryData, TelemetryHistory, CalibrationState } from '../hooks/useM
 import { ComponentPrediction, MaintenanceRecommendation } from '../hooks/usePredictiveEngine';
 import { MaintenancePanel } from './MaintenancePanel';
 import { SpectralPanel } from './SpectralPanel';
-import { Activity, Thermometer, Volume2, Gauge, ChevronDown, ChevronUp, Power, Trash2, Cpu, Wifi, Clock, BrainCircuit, CheckCircle2 } from 'lucide-react';
+import { Activity, Thermometer, Volume2, Gauge, ChevronDown, ChevronUp, Power, Trash2, Cpu, Wifi, Clock, BrainCircuit, CheckCircle2, Network } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 
 interface TelemetryPanelProps {
@@ -32,6 +32,8 @@ interface TelemetryPanelProps {
   setVariableRpm: (val: boolean) => void;
   tamperedPod: boolean;
   setTamperedPod: (val: boolean) => void;
+  multiPodMesh: boolean;
+  setMultiPodMesh: (val: boolean) => void;
 }
 
 type TabId = 'telemetry' | 'maintenance' | 'spectral';
@@ -156,7 +158,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   activeModelId, onSelectModel, isPowered, onTogglePower, onRemoveDevice,
   history = [], predictions, recommendations,
   calibrationState, discoveredComponents, onVerifyCalibration,
-  calibrationProgress, variableRpm, setVariableRpm, tamperedPod, setTamperedPod
+  calibrationProgress, variableRpm, setVariableRpm, tamperedPod, setTamperedPod,
+  multiPodMesh, setMultiPodMesh
 }) => {
   const [activeTab, setActiveTab] = useState<TabId>('telemetry');
   const [devToolsOpen, setDevToolsOpen] = useState(false);
@@ -356,6 +359,44 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           <>
             <ModelSelector activeModelId={activeModelId} onSelectModel={onSelectModel} />
 
+            {/* Phase 5: Sentinel Mesh Visualization */}
+            {multiPodMesh && (
+              <div className="p-4 rounded-lg flex flex-col gap-3 relative overflow-hidden" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+                {/* Background Network Graphic */}
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                  <Network className="w-32 h-32" />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-semibold text-[var(--accent)] flex items-center gap-1.5">
+                      <Network className="w-3.5 h-3.5" />
+                      Sentinel Mesh Active
+                    </h3>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">3 ESP-NOW nodes grouped to this machine</p>
+                  </div>
+                  <div className="px-2 py-1 rounded bg-[var(--nominal-bg)] border border-[var(--nominal-border)] text-[9px] font-bold text-[var(--status-nominal)]">
+                    SYNCED
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  {[
+                    { id: 'master', label: 'Drive (Master)', lat: '<1ms' },
+                    { id: 'node1', label: 'Gearbox (Slave)', lat: '2.4ms' },
+                    { id: 'node2', label: 'Spindle (Slave)', lat: '3.1ms' }
+                  ].map(node => (
+                    <div key={node.id} className="flex flex-col items-center justify-center p-2 rounded bg-[var(--surface-3)] border border-[var(--surface-4)] text-center relative">
+                      <div className="w-2 h-2 rounded-full absolute top-1.5 right-1.5 animate-pulse" style={{ background: 'var(--status-nominal)' }} />
+                      <Wifi className="w-4 h-4 mb-1" style={{ color: 'var(--text-dim)' }} />
+                      <span className="text-[9px] font-semibold text-[var(--text-primary)]">{node.label}</span>
+                      <span className="text-[8px] font-mono text-[var(--status-watch)] mt-0.5">{node.lat}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Diagnostics */}
             <div
               className="px-3 py-2.5 rounded-lg"
@@ -461,6 +502,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                   <Toggle checked={forceFault} onChange={setForceFault} label="Trigger Critical Fault" accent="var(--status-critical)" />
                   <Toggle checked={variableRpm} onChange={setVariableRpm} label="Variable Machine RPM" accent="var(--status-warning)" />
                   <Toggle checked={tamperedPod} onChange={setTamperedPod} label="Trigger Tamper Event" accent="var(--status-critical)" />
+                  <Toggle checked={multiPodMesh} onChange={setMultiPodMesh} label="Simulate Multi-Pod Mesh" accent="var(--status-watch)" />
                 </>
               )}
             </div>
