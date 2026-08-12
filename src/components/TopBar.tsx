@@ -1,33 +1,115 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Activity, Clock } from 'lucide-react';
+import { Shield, Clock, Bell, LayoutGrid, Monitor, Menu } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-export const TopBar: React.FC = () => {
+interface TopBarProps {
+  activeAlertCount?: number;
+  criticalAlertCount?: number;
+  onToggleAlerts?: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({ activeAlertCount = 0, criticalAlertCount = 0, onToggleAlerts }) => {
   const [time, setTime] = useState<string>('--:--:--');
+  const [date, setDate] = useState<string>('');
+  const pathname = usePathname();
 
   useEffect(() => {
-    setTime(new Date().toLocaleTimeString());
-    const interval = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
+    const update = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('en-US', { hour12: false }));
+      setDate(now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+    };
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, []);
 
+  const navItems = [
+    { href: '/', label: 'Monitor', icon: Monitor },
+    { href: '/admin', label: 'Fleet Overview', icon: LayoutGrid },
+  ];
+
   return (
-    <header className="w-full h-16 flex-shrink-0 bg-slate-900/60 backdrop-blur-lg border-b border-slate-800/80 flex items-center justify-between px-8 z-20 shadow-sm">
-      <div className="flex items-center space-x-4">
-        <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-          <Activity className="w-6 h-6 text-emerald-400" />
+    <header className="w-full h-14 flex-shrink-0 flex items-center justify-between px-5 z-20"
+      style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--surface-border)' }}
+    >
+      {/* Left: Brand */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-soft)' }}>
+            <Shield className="w-4.5 h-4.5" style={{ color: 'var(--accent)' }} />
+          </div>
+          <div className="leading-tight">
+            <h1 className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              SentinelEdge
+            </h1>
+            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+              Industrial IoT
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 tracking-wide">
-            IoT Edge Fleet Monitor
-          </h1>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mt-0.5">Central Command Station</p>
-        </div>
+
+        {/* Navigation */}
+        <nav className="flex items-center gap-1 ml-4 px-1 py-1 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200"
+                style={{
+                  background: isActive ? 'var(--accent-soft)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
-      <div className="flex items-center space-x-3 px-4 py-2 bg-slate-800/50 rounded-full border border-slate-700/50 text-slate-300 text-sm font-mono shadow-inner">
-        <Clock className="w-4 h-4 text-blue-400" />
-        <span>{time}</span>
+
+      {/* Right: Alerts + Clock */}
+      <div className="flex items-center gap-3">
+        {/* Alert Bell */}
+        {onToggleAlerts && (
+          <button
+            onClick={onToggleAlerts}
+            className="relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:opacity-90"
+            style={{
+              background: criticalAlertCount > 0 ? 'var(--critical-bg)' : activeAlertCount > 0 ? 'var(--warning-bg)' : 'var(--surface-2)',
+              border: `1px solid ${criticalAlertCount > 0 ? 'var(--critical-border)' : activeAlertCount > 0 ? 'var(--warning-border)' : 'var(--surface-border)'}`,
+              color: criticalAlertCount > 0 ? 'var(--status-critical)' : activeAlertCount > 0 ? 'var(--status-warning)' : 'var(--text-muted)',
+            }}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            <span>Alerts</span>
+            {activeAlertCount > 0 && (
+              <span
+                className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold text-white px-1"
+                style={{ background: criticalAlertCount > 0 ? 'var(--status-critical)' : 'var(--status-warning)' }}
+              >
+                {activeAlertCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Clock */}
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono text-xs"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}
+        >
+          <Clock className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <span style={{ color: 'var(--text-primary)' }}>{time}</span>
+          <span style={{ color: 'var(--text-dim)' }}>·</span>
+          <span>{date}</span>
+        </div>
       </div>
     </header>
   );

@@ -1,4 +1,7 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -8,21 +11,59 @@ interface ModalProps {
 }
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
+  // Click outside to close
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="flex items-center justify-between p-4 border-b border-slate-800">
-          <h2 className="text-lg font-bold text-slate-100">{title}</h2>
-          <button 
+    <div
+      ref={overlayRef}
+      onClick={handleOverlayClick}
+      className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in"
+      style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(6px)' }}
+    >
+      <div
+        ref={panelRef}
+        className="w-full max-w-md overflow-hidden animate-scale-in"
+        style={{
+          background: 'var(--surface-2)',
+          border: '1px solid var(--surface-border-light)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--surface-border)' }}
+        >
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+          <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors p-1"
+            className="p-1.5 rounded-lg transition-colors duration-150 hover:bg-white/5"
+            style={{ color: 'var(--text-muted)' }}
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6">
+        {/* Body */}
+        <div className="px-5 py-5">
           {children}
         </div>
       </div>

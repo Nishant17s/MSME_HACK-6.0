@@ -1,7 +1,12 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import { EStopBanner } from './EStopBanner';
-import { TelemetryData } from '../hooks/useMqttTelemetry';
-import { Activity, Thermometer, Volume2, Wifi, WifiOff } from 'lucide-react';
+import { TelemetryData, TelemetryHistory } from '../hooks/useMqttTelemetry';
+import { ComponentPrediction, MaintenanceRecommendation } from '../hooks/usePredictiveEngine';
+import { MaintenancePanel } from './MaintenancePanel';
+import { SpectralPanel } from './SpectralPanel';
+import { Activity, Thermometer, Volume2, Gauge, ChevronDown, ChevronUp, Power, Trash2, Cpu, Wifi, Clock } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 
 interface TelemetryPanelProps {
@@ -16,159 +21,338 @@ interface TelemetryPanelProps {
   isPowered: boolean;
   onTogglePower: () => void;
   onRemoveDevice: () => void;
+  history?: TelemetryData[];
+  predictions: ComponentPrediction[];
+  recommendations: MaintenanceRecommendation[];
 }
 
-const MetricCard = ({ title, value, unit, icon, critical }: { title: string, value: string | number, unit: string, icon: React.ReactNode, critical?: boolean }) => (
-  <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
-    critical 
-      ? 'bg-red-950/40 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' 
-      : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/60'
-  }`}>
-    {critical && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-rose-400" />}
-    <div className="flex items-center justify-between mb-3 text-slate-400">
-      <span className="text-xs font-bold tracking-widest uppercase">{title}</span>
-      <div className={critical ? 'text-red-400 animate-pulse' : 'text-slate-500'}>
-        {icon}
+type TabId = 'telemetry' | 'maintenance' | 'spectral';
+
+// ── Circular Gauge ──
+const CircularGauge: React.FC<{
+  value: number;
+  max: number;
+  label: string;
+  unit: string;
+  icon: React.ReactNode;
+  thresholds: { warning: number; critical: number };
+}> = ({ value, max, label, unit, icon, thresholds }) => {
+  const size = 100;
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(value / max, 1);
+  const offset = circumference - pct * circumference;
+
+  const isCritical = value >= thresholds.critical;
+  const isWarning = value >= thresholds.warning;
+  const color = isCritical ? 'var(--status-critical)' : isWarning ? 'var(--status-warning)' : 'var(--accent)';
+
+  return (
+    <div
+      className="flex flex-col items-center p-3 transition-all duration-300"
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        background: isCritical ? 'var(--critical-bg)' : 'var(--surface-2)',
+        border: `1px solid ${isCritical ? 'var(--critical-border)' : 'var(--surface-border)'}`,
+      }}
+    >
+      <svg width={size} height={size} className="gauge-ring">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--surface-4)" strokeWidth={strokeWidth} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth}
+          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+          style={{ filter: isCritical ? `drop-shadow(0 0 4px ${color})` : 'none' }}
+        />
+        <text x={size / 2} y={size / 2 - 4} textAnchor="middle" dominantBaseline="central"
+          fill={color} fontSize="18" fontWeight="700" fontFamily="var(--font-mono)"
+          transform={`rotate(90, ${size / 2}, ${size / 2})`}
+        >
+          {typeof value === 'number' ? value.toFixed(value >= 100 ? 0 : 1) : value}
+        </text>
+        <text x={size / 2} y={size / 2 + 14} textAnchor="middle" dominantBaseline="central"
+          fill="var(--text-dim)" fontSize="9" fontFamily="var(--font-mono)"
+          transform={`rotate(90, ${size / 2}, ${size / 2})`}
+        >
+          {unit}
+        </text>
+      </svg>
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <span style={{ color: 'var(--text-dim)' }}>{icon}</span>
+        <span className="text-[10px] font-semibold" style={{ color: 'var(--text-secondary)', letterSpacing: '0.03em' }}>
+          {label}
+        </span>
       </div>
     </div>
-    <div className="flex items-baseline space-x-1.5">
-      <span className={`text-4xl font-black tracking-tight ${critical ? 'text-red-400' : 'text-slate-100'}`}>{value}</span>
-      <span className="text-slate-500 font-medium text-sm">{unit}</span>
+  );
+};
+
+// ── Sparkline ──
+const Sparkline: React.FC<{ data: number[]; color: string; height?: number; width?: number }> = ({
+  data, color, height = 28, width = 120
+}) => {
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const step = width / (data.length - 1);
+
+  const points = data.map((v, i) => {
+    const x = i * step;
+    const y = height - ((v - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const lastIdx = data.length - 1;
+  const areaPoints = `0,${height} ${points} ${lastIdx * step},${height}`;
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <defs>
+        <linearGradient id={`spark-grad-${color.replace(/[^a-z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPoints} fill={`url(#spark-grad-${color.replace(/[^a-z0-9]/g, '')})`} />
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lastIdx * step} cy={height - ((data[lastIdx] - min) / range) * (height - 4) - 2} r="2.5" fill={color} />
+    </svg>
+  );
+};
+
+// ── Toggle ──
+const Toggle: React.FC<{ checked: boolean; onChange: (val: boolean) => void; label: string; accent?: string }> = ({
+  checked, onChange, label, accent = 'var(--accent)'
+}) => (
+  <label className="flex items-center gap-3 cursor-pointer py-1">
+    <div
+      className="relative w-9 h-5 rounded-full transition-colors duration-200"
+      style={{ background: checked ? accent : 'var(--surface-4)' }}
+      onClick={() => onChange(!checked)}
+    >
+      <div
+        className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
+        style={{
+          background: '#fff',
+          transform: checked ? 'translateX(18px)' : 'translateX(2px)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      />
     </div>
-  </div>
+    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+  </label>
 );
 
 export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
-  data,
-  status,
-  simulated,
-  setSimulated,
-  forceFault,
-  setForceFault,
-  activeModelId,
-  onSelectModel,
-  isPowered,
-  onTogglePower,
-  onRemoveDevice
+  data, status, simulated, setSimulated, forceFault, setForceFault,
+  activeModelId, onSelectModel, isPowered, onTogglePower, onRemoveDevice,
+  history = [], predictions, recommendations
 }) => {
+  const [activeTab, setActiveTab] = useState<TabId>('telemetry');
+  const [devToolsOpen, setDevToolsOpen] = useState(false);
+
+  const tabs: { id: TabId; label: string; badge?: number }[] = [
+    { id: 'telemetry', label: 'Telemetry' },
+    { id: 'maintenance', label: 'Maintenance', badge: recommendations.length || undefined },
+    { id: 'spectral', label: 'Spectral' },
+  ];
+
   const getDiagnostics = () => {
-    if (!isPowered) return "System Offline - Power Cut";
-    if (data.anomaly_score < 50) return "All Systems Nominal";
+    if (!isPowered) return { text: 'System Offline — Power Disconnected', tier: 'offline' };
+    if (data.anomaly_score < 35) return { text: 'All Systems Nominal', tier: 'nominal' };
+    if (data.anomaly_score < 55) return { text: 'Minor Irregularity — Monitoring', tier: 'watch' };
     const faults = [];
-    if (data.temp >= 75) faults.push("Motor Overheating");
-    if (data.sound >= 85) faults.push("Gear Wear Detected");
-    if (data.vibration >= 5) faults.push("Bearing Imbalance");
-    if (faults.length === 0 && data.anomaly_score >= 80) return "Unknown Critical Anomaly";
-    return faults.length > 0 ? faults.join(" • ") : "Minor Irregularities Detected";
+    if (data.temp >= 75) faults.push('Motor Overheating');
+    if (data.sound >= 85) faults.push('Gear Wear Detected');
+    if (data.vibration >= 5) faults.push('Bearing Imbalance');
+    if (faults.length === 0 && data.anomaly_score >= 80) return { text: 'Unknown Critical Anomaly', tier: 'critical' };
+    if (faults.length > 0) return { text: faults.join(' · '), tier: data.anomaly_score >= 80 ? 'critical' : 'warning' };
+    return { text: 'Minor Irregularities', tier: 'warning' };
   };
 
-  const diagnosticsMsg = getDiagnostics();
-  const isCritical = data.anomaly_score >= 80;
+  const diag = getDiagnostics();
+  const diagColor = diag.tier === 'critical' ? 'var(--status-critical)' : diag.tier === 'warning' ? 'var(--status-warning)' : diag.tier === 'watch' ? 'var(--status-watch)' : diag.tier === 'offline' ? 'var(--status-offline)' : 'var(--status-nominal)';
+  const diagBg = diag.tier === 'critical' ? 'var(--critical-bg)' : diag.tier === 'warning' ? 'var(--warning-bg)' : diag.tier === 'watch' ? 'rgba(59,130,246,0.08)' : 'var(--nominal-bg)';
+
+  const tempHistory = history.map(h => h.temp);
+  const soundHistory = history.map(h => h.sound);
+  const vibHistory = history.map(h => h.vibration);
+  const anomalyHistory = history.map(h => h.anomaly_score);
 
   return (
-    <div className="h-full w-full p-6 flex flex-col space-y-6 overflow-y-auto custom-scrollbar border-l border-slate-800/80 bg-slate-900/90 backdrop-blur-xl relative z-10">
-      
-      <div className="flex items-center justify-between">
+    <div
+      className="h-full w-full flex flex-col overflow-hidden relative z-10"
+      style={{ background: 'var(--surface-1)', borderLeft: '1px solid var(--surface-border)' }}
+    >
+      {/* Header */}
+      <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--surface-border)' }}>
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Telemetry Data</h1>
-          <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">Live Feed</p>
+          <h1 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Pod Dashboard</h1>
+          <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--text-dim)' }}>
+            {status === 'Connected' ? 'LIVE' : status.toUpperCase()} · FW {data.pod_firmware}
+          </p>
         </div>
-        <button 
+        <button
           onClick={onTogglePower}
-          className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
-            isPowered 
-              ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30' 
-              : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
-          }`}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200"
+          style={{
+            background: isPowered ? 'var(--critical-bg)' : 'var(--nominal-bg)',
+            border: `1px solid ${isPowered ? 'var(--critical-border)' : 'var(--nominal-border)'}`,
+            color: isPowered ? 'var(--status-critical)' : 'var(--status-nominal)',
+          }}
         >
-          {isPowered ? 'CUT POWER' : 'POWER ON'}
+          <Power className="w-3.5 h-3.5" />
+          {isPowered ? 'E-STOP' : 'POWER ON'}
         </button>
       </div>
 
-      <ModelSelector activeModelId={activeModelId} onSelectModel={onSelectModel} />
-
-      {/* Diagnostics Panel */}
-      <div className={`p-4 rounded-xl border ${
-        !isPowered ? 'bg-slate-800/50 border-slate-700 text-slate-400' :
-        isCritical ? 'bg-red-950/40 border-red-500/50 text-red-400' : 
-        data.anomaly_score >= 50 ? 'bg-yellow-950/40 border-yellow-500/50 text-yellow-400' : 
-        'bg-emerald-950/40 border-emerald-500/50 text-emerald-400'
-      }`}>
-        <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">System Diagnostics</h3>
-        <p className="text-sm font-medium">{diagnosticsMsg}</p>
+      {/* Tab Bar */}
+      <div className="flex items-center gap-1 px-3 py-1.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all duration-150"
+            style={{
+              background: activeTab === tab.id ? 'var(--accent-soft)' : 'transparent',
+              color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
+            }}
+          >
+            {tab.label}
+            {tab.badge && tab.badge > 0 && (
+              <span
+                className="inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full text-[9px] font-bold text-white px-1"
+                style={{ background: 'var(--status-warning)' }}
+              >
+                {tab.badge}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      <EStopBanner anomalyScore={data.anomaly_score} />
+      {/* Tab Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
 
-      <div className="grid grid-cols-2 gap-4">
-        <MetricCard 
-          title="Temp" 
-          value={data.temp.toFixed(1)} 
-          unit="°C" 
-          icon={<Thermometer className="w-5 h-5" />} 
-          critical={data.temp >= 75} 
-        />
-        <MetricCard 
-          title="Sound" 
-          value={data.sound.toFixed(1)} 
-          unit="dB" 
-          icon={<Volume2 className="w-5 h-5" />} 
-          critical={data.sound >= 85} 
-        />
-        <MetricCard 
-          title="Vibration" 
-          value={data.vibration.toFixed(2)} 
-          unit="mm/s" 
-          icon={<Activity className="w-5 h-5" />} 
-          critical={data.vibration >= 5} 
-        />
-        <MetricCard 
-          title="Anomaly" 
-          value={data.anomaly_score.toFixed(0)} 
-          unit="%" 
-          icon={<Activity className="w-5 h-5" />} 
-          critical={data.anomaly_score >= 80} 
-        />
-      </div>
+        {activeTab === 'telemetry' && (
+          <>
+            <ModelSelector activeModelId={activeModelId} onSelectModel={onSelectModel} />
 
-      {/* Dev Controls */}
-      <div className="mt-auto pt-4 pb-12 border-t border-slate-800">
-        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Dev Controls</h3>
-        <div className="flex flex-col space-y-3">
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={simulated} 
-              onChange={e => setSimulated(e.target.checked)}
-              className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900" 
-            />
-            <span className="text-slate-300">Enable Local Simulation</span>
-          </label>
-          
-          {simulated && (
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={forceFault} 
-                onChange={e => setForceFault(e.target.checked)}
-                className="w-5 h-5 rounded border-red-600 bg-slate-700 text-red-500 focus:ring-red-500 focus:ring-offset-slate-900" 
-              />
-              <span className="text-slate-300">Trigger Critical Fault</span>
-            </label>
+            {/* Diagnostics */}
+            <div
+              className="px-3 py-2.5 rounded-lg"
+              style={{ background: diagBg, border: `1px solid ${diag.tier === 'critical' ? 'var(--critical-border)' : diag.tier === 'warning' ? 'var(--warning-border)' : 'var(--nominal-border)'}` }}
+            >
+              <h3 className="text-[10px] font-semibold uppercase mb-0.5" style={{ color: diagColor, letterSpacing: '0.05em', opacity: 0.8 }}>
+                Diagnostics
+              </h3>
+              <p className="text-xs font-medium" style={{ color: diagColor }}>{diag.text}</p>
+            </div>
+
+            <EStopBanner anomalyScore={data.anomaly_score} isPowered={isPowered} />
+
+            {/* Gauges */}
+            <div className="grid grid-cols-2 gap-3">
+              <CircularGauge value={data.temp} max={120} label="Temperature" unit="°C" icon={<Thermometer className="w-3 h-3" />} thresholds={{ warning: 65, critical: 75 }} />
+              <CircularGauge value={data.sound} max={130} label="Sound Level" unit="dB" icon={<Volume2 className="w-3 h-3" />} thresholds={{ warning: 75, critical: 85 }} />
+              <CircularGauge value={data.vibration} max={12} label="Vibration" unit="mm/s" icon={<Activity className="w-3 h-3" />} thresholds={{ warning: 4, critical: 5 }} />
+              <CircularGauge value={data.anomaly_score} max={100} label="Anomaly" unit="%" icon={<Gauge className="w-3 h-3" />} thresholds={{ warning: 55, critical: 80 }} />
+            </div>
+
+            {/* Sparklines */}
+            {history.length >= 2 && (
+              <div
+                className="p-3 rounded-lg space-y-2.5"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-lg)' }}
+              >
+                <h3 className="text-[10px] font-semibold uppercase" style={{ color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
+                  Trend ({history.length} readings)
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-dim)' }}>TEMP</span>
+                    <Sparkline data={tempHistory} color="var(--status-warning)" width={130} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-dim)' }}>SOUND</span>
+                    <Sparkline data={soundHistory} color="var(--status-watch)" width={130} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-dim)' }}>VIBRATION</span>
+                    <Sparkline data={vibHistory} color="var(--accent)" width={130} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-dim)' }}>ANOMALY</span>
+                    <Sparkline data={anomalyHistory} color="var(--status-critical)" width={130} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Pod Metadata */}
+            <div
+              className="p-3 rounded-lg grid grid-cols-3 gap-2"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-lg)' }}
+            >
+              <div className="flex flex-col items-center py-1">
+                <Cpu className="w-3 h-3 mb-1" style={{ color: 'var(--text-dim)' }} />
+                <span className="text-[9px] font-mono" style={{ color: 'var(--text-primary)' }}>{data.pod_firmware}</span>
+                <span className="text-[7px] uppercase" style={{ color: 'var(--text-dim)' }}>Firmware</span>
+              </div>
+              <div className="flex flex-col items-center py-1">
+                <Clock className="w-3 h-3 mb-1" style={{ color: 'var(--text-dim)' }} />
+                <span className="text-[9px] font-mono" style={{ color: 'var(--text-primary)' }}>{data.pod_uptime_hours.toFixed(1)}h</span>
+                <span className="text-[7px] uppercase" style={{ color: 'var(--text-dim)' }}>Uptime</span>
+              </div>
+              <div className="flex flex-col items-center py-1">
+                <Wifi className="w-3 h-3 mb-1" style={{ color: data.signal_quality > 70 ? 'var(--status-nominal)' : 'var(--status-warning)' }} />
+                <span className="text-[9px] font-mono" style={{ color: 'var(--text-primary)' }}>{data.signal_quality.toFixed(0)}%</span>
+                <span className="text-[7px] uppercase" style={{ color: 'var(--text-dim)' }}>Signal</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'maintenance' && (
+          <MaintenancePanel predictions={predictions} recommendations={recommendations} isPowered={isPowered} />
+        )}
+
+        {activeTab === 'spectral' && (
+          <SpectralPanel data={data} history={history} isPowered={isPowered} />
+        )}
+
+        {/* Dev Tools (always visible at bottom) */}
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-lg)' }}
+        >
+          <button
+            onClick={() => setDevToolsOpen(!devToolsOpen)}
+            className="w-full px-4 py-2 flex items-center justify-between text-left"
+          >
+            <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
+              Dev Tools
+            </span>
+            {devToolsOpen ? <ChevronUp className="w-3.5 h-3.5" style={{ color: 'var(--text-dim)' }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-dim)' }} />}
+          </button>
+          {devToolsOpen && (
+            <div className="px-4 pb-3 space-y-2 pt-2" style={{ borderTop: '1px solid var(--surface-border)' }}>
+              <Toggle checked={simulated} onChange={setSimulated} label="Local Simulation" />
+              {simulated && <Toggle checked={forceFault} onChange={setForceFault} label="Trigger Critical Fault" accent="var(--status-critical)" />}
+            </div>
           )}
         </div>
-      </div>
-      
-      {/* Danger Zone */}
-      <div className="mt-4">
-        <button 
+
+        {/* Remove */}
+        <button
           onClick={onRemoveDevice}
-          className="w-full py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 bg-red-950/30 text-red-400 hover:bg-red-900/50 border border-red-900/50"
+          className="w-full py-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 hover:opacity-80"
+          style={{ background: 'var(--critical-bg)', border: '1px solid var(--critical-border)', color: 'var(--status-critical)', borderRadius: 'var(--radius-md)' }}
         >
-          Remove Device
+          <Trash2 className="w-3.5 h-3.5" />
+          Remove Pod
         </button>
       </div>
-      
     </div>
   );
 };

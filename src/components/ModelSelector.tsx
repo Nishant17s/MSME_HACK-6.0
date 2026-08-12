@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useRef, useState } from 'react';
-import { Box, Upload } from 'lucide-react';
+import { Box, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import { Modal } from './Modal';
 
 interface ModelOption {
@@ -12,8 +14,8 @@ export const availableModels: ModelOption[] = [
   { id: 'lathe', name: 'Industrial Lathe', url: '/models/lathe.glb' },
   { id: 'cnc', name: 'CNC Machine', url: '/models/cnc_machine.glb' },
   { id: 'sensor-pod', name: 'Sensor Pod Base', url: '/models/sensor_pod.glb' },
-  { id: 'gearbox', name: 'Gearbox Assembly', url: '/models/lathe.glb' }, // Currently sharing lathe as placeholder
-  { id: 'robotic-arm', name: 'Robotic Arm', url: '/models/lathe.glb' } 
+  { id: 'gearbox', name: 'Gearbox Assembly', url: '/models/lathe.glb' },
+  { id: 'robotic-arm', name: 'Robotic Arm', url: '/models/lathe.glb' }
 ];
 
 interface ModelSelectorProps {
@@ -23,8 +25,8 @@ interface ModelSelectorProps {
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onSelectModel }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isCollapsed, setIsCollapsed] = useState(activeModelId === 'custom-upload');
-  
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
   // Custom upload state
   const [showNameModal, setShowNameModal] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -49,82 +51,125 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onS
     }
   };
 
+  const activeModel = availableModels.find(m => m.id === activeModelId);
+
   return (
-    <div className="w-full p-4 rounded-xl border border-slate-700 bg-slate-800/50 backdrop-blur-md flex flex-col space-y-3">
-      <div 
-        className="flex items-center justify-between text-slate-300 cursor-pointer hover:text-slate-100 transition-colors"
+    <div
+      className="w-full overflow-hidden"
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--surface-border)',
+      }}
+    >
+      {/* Toggle Header */}
+      <button
+        className="w-full flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-white/[0.02]"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <div className="flex items-center space-x-2">
-          <Box className="w-5 h-5" />
-          <h3 className="text-sm font-semibold uppercase tracking-wider">3D Asset Selection</h3>
+        <div className="flex items-center gap-2">
+          <Box className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', letterSpacing: '0.03em' }}>
+            3D Asset
+          </span>
+          {activeModel && (
+            <span
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            >
+              {activeModel.name}
+            </span>
+          )}
+          {activeModelId === 'custom-upload' && (
+            <span
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            >
+              Custom Upload
+            </span>
+          )}
         </div>
-        <span className="text-xs font-mono bg-slate-900/50 px-2 py-1 rounded text-slate-400">
-          {isCollapsed ? 'EXPAND' : 'COLLAPSE'}
-        </span>
-      </div>
-      
+        {isCollapsed ? (
+          <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-dim)' }} />
+        ) : (
+          <ChevronUp className="w-3.5 h-3.5" style={{ color: 'var(--text-dim)' }} />
+        )}
+      </button>
+
+      {/* Expanded Content */}
       {!isCollapsed && (
-        <div className="flex flex-col space-y-2 mt-2 border-t border-slate-700/50 pt-3">
-          {availableModels.map((model) => (
+        <div className="px-3 pb-3 space-y-1.5" style={{ borderTop: '1px solid var(--surface-border)' }}>
+          <div className="pt-2" />
+          {availableModels.map(model => (
+            <button
+              key={model.id}
+              onClick={() => { onSelectModel(model.id, model.url); setIsCollapsed(true); }}
+              className="w-full px-3 py-2 text-left text-xs font-medium transition-all duration-150"
+              style={{
+                borderRadius: 'var(--radius-sm)',
+                background: activeModelId === model.id ? 'var(--accent-soft)' : 'transparent',
+                color: activeModelId === model.id ? 'var(--accent)' : 'var(--text-secondary)',
+                border: `1px solid ${activeModelId === model.id ? 'rgba(20, 184, 166, 0.2)' : 'transparent'}`,
+              }}
+            >
+              {model.name}
+            </button>
+          ))}
+
+          {/* Upload Custom */}
           <button
-            key={model.id}
-            onClick={() => onSelectModel(model.id, model.url)}
-            className={`px-4 py-2 text-left rounded-lg transition-colors border ${
-              activeModelId === model.id
-                ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:bg-slate-700'
-            }`}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full px-3 py-2 text-left text-xs font-medium flex items-center justify-between transition-all duration-150"
+            style={{
+              borderRadius: 'var(--radius-sm)',
+              background: activeModelId === 'custom-upload' ? 'var(--accent-soft)' : 'transparent',
+              color: 'var(--accent)',
+              border: `1px dashed ${activeModelId === 'custom-upload' ? 'var(--accent)' : 'var(--surface-border-light)'}`,
+            }}
           >
-            {model.name}
+            <span>Upload Custom GLB</span>
+            <Upload className="w-3.5 h-3.5" />
           </button>
-        ))}
-        
-        {/* Custom Upload Button */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className={`px-4 py-2 text-left rounded-lg transition-colors border flex items-center justify-between ${
-            activeModelId === 'custom-upload'
-              ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400'
-              : 'bg-slate-900/50 border-slate-700 text-emerald-400 hover:bg-slate-700'
-          }`}
-        >
-          <span>Upload Custom GLB</span>
-          <Upload className="w-4 h-4" />
-        </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            accept=".glb,.gltf" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".glb,.gltf"
             style={{ display: 'none' }}
           />
         </div>
       )}
 
-      {/* Premium UI for Naming the Custom Upload */}
+      {/* Name Custom Upload Modal */}
       <Modal isOpen={showNameModal} onClose={() => setShowNameModal(false)} title="Name Custom Machine">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Machine Name</label>
-            <input 
-              type="text" 
+            <label className="block text-[10px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+              Machine Name
+            </label>
+            <input
+              type="text"
               value={customMachineName}
               onChange={(e) => setCustomMachineName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style={{
+                background: 'var(--surface-3)',
+                border: '1px solid var(--surface-border-light)',
+                color: 'var(--text-primary)',
+              }}
               placeholder="e.g. Injection Molder"
               autoFocus
             />
           </div>
-          <button 
+          <button
             onClick={confirmCustomUpload}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg py-2.5 transition-colors"
+            className="w-full py-2.5 rounded-lg text-sm font-semibold transition-colors hover:opacity-90"
+            style={{ background: 'var(--accent)', color: '#fff' }}
           >
             Confirm Upload
           </button>
         </div>
       </Modal>
-
     </div>
   );
 };
