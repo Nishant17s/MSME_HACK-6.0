@@ -31,6 +31,14 @@ export default function Dashboard() {
     lastUpdated,
     telemetryHistory,
     reconnectAttempts,
+    calibrationStates,
+    discoveredComponents,
+    verifyCalibration,
+    calibrationProgress,
+    variableRpm,
+    setVariableRpm,
+    tamperedPod,
+    setTamperedPod,
   } = useMqttTelemetry();
 
   const {
@@ -56,6 +64,20 @@ export default function Dashboard() {
 
   // State for which 3D model is active for each device
   const [deviceModels, setDeviceModels] = useState<Record<string, { id: string, url?: string }>>({});
+
+  // Persist device models to localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('sentinel_deviceModels');
+    if (saved) {
+      try { setDeviceModels(JSON.parse(saved)); } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Object.keys(deviceModels).length > 0) {
+      localStorage.setItem('sentinel_deviceModels', JSON.stringify(deviceModels));
+    }
+  }, [deviceModels]);
 
   // Alert panel toggle
   const [alertPanelOpen, setAlertPanelOpen] = useState(false);
@@ -123,7 +145,8 @@ export default function Dashboard() {
   const { predictions, recommendations } = usePredictiveEngine(
     activeDeviceTelemetry,
     activeDeviceHistory,
-    isPowered
+    isPowered,
+    discoveredComponents[activeDeviceId]
   );
 
   // Fleet stats for status bar
@@ -182,6 +205,14 @@ export default function Dashboard() {
               history={activeDeviceHistory}
               predictions={predictions}
               recommendations={recommendations}
+              calibrationState={calibrationStates[activeDeviceId]}
+              discoveredComponents={discoveredComponents[activeDeviceId] || []}
+              onVerifyCalibration={(comps) => verifyCalibration(activeDeviceId, comps)}
+              calibrationProgress={calibrationProgress[activeDeviceId] || 0}
+              variableRpm={variableRpm}
+              setVariableRpm={setVariableRpm}
+              tamperedPod={tamperedPod === activeDeviceId}
+              setTamperedPod={(val) => setTamperedPod(val ? activeDeviceId : null)}
             />
           )}
         </section>

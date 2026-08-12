@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react';
 import { EStopBanner } from './EStopBanner';
-import { TelemetryData, TelemetryHistory } from '../hooks/useMqttTelemetry';
+import { TelemetryData, TelemetryHistory, CalibrationState } from '../hooks/useMqttTelemetry';
 import { ComponentPrediction, MaintenanceRecommendation } from '../hooks/usePredictiveEngine';
 import { MaintenancePanel } from './MaintenancePanel';
 import { SpectralPanel } from './SpectralPanel';
-import { Activity, Thermometer, Volume2, Gauge, ChevronDown, ChevronUp, Power, Trash2, Cpu, Wifi, Clock } from 'lucide-react';
+import { Activity, Thermometer, Volume2, Gauge, ChevronDown, ChevronUp, Power, Trash2, Cpu, Wifi, Clock, BrainCircuit, CheckCircle2 } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 
 interface TelemetryPanelProps {
@@ -24,6 +24,14 @@ interface TelemetryPanelProps {
   history?: TelemetryData[];
   predictions: ComponentPrediction[];
   recommendations: MaintenanceRecommendation[];
+  calibrationState: CalibrationState;
+  discoveredComponents: string[];
+  onVerifyCalibration: (components: string[]) => void;
+  calibrationProgress: number;
+  variableRpm: boolean;
+  setVariableRpm: (val: boolean) => void;
+  tamperedPod: boolean;
+  setTamperedPod: (val: boolean) => void;
 }
 
 type TabId = 'telemetry' | 'maintenance' | 'spectral';
@@ -146,10 +154,13 @@ const Toggle: React.FC<{ checked: boolean; onChange: (val: boolean) => void; lab
 export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   data, status, simulated, setSimulated, forceFault, setForceFault,
   activeModelId, onSelectModel, isPowered, onTogglePower, onRemoveDevice,
-  history = [], predictions, recommendations
+  history = [], predictions, recommendations,
+  calibrationState, discoveredComponents, onVerifyCalibration,
+  calibrationProgress, variableRpm, setVariableRpm, tamperedPod, setTamperedPod
 }) => {
   const [activeTab, setActiveTab] = useState<TabId>('telemetry');
   const [devToolsOpen, setDevToolsOpen] = useState(false);
+  const [pendingComponents, setPendingComponents] = useState<string[]>(discoveredComponents);
 
   const tabs: { id: TabId; label: string; badge?: number }[] = [
     { id: 'telemetry', label: 'Telemetry' },
@@ -159,6 +170,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
 
   const getDiagnostics = () => {
     if (!isPowered) return { text: 'System Offline — Power Disconnected', tier: 'offline' };
+    if (data.pod_status === 'tampered') return { text: 'Pod Misalignment / Tamper Detected', tier: 'critical' };
     if (data.anomaly_score < 35) return { text: 'All Systems Nominal', tier: 'nominal' };
     if (data.anomaly_score < 55) return { text: 'Minor Irregularity — Monitoring', tier: 'watch' };
     const faults = [];
@@ -179,6 +191,112 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   const vibHistory = history.map(h => h.vibration);
   const anomalyHistory = history.map(h => h.anomaly_score);
 
+  // Auto-Calibration View
+  if (calibrationState === 'calibrating') {
+    let calibPhase = 'Environment Noise Profiling...';
+    let calibDesc = 'Learning ambient factory noise to establish a baseline.';
+    const pct = Math.min((calibrationProgress / 15) * 100, 100);
+    
+    if (calibrationProgress >= 10) {
+      calibPhase = 'Component Inference...';
+      calibDesc = 'Applying Blind Source Separation to discover mechanical components.';
+    } else if (calibrationProgress >= 5) {
+      calibPhase = 'RPM Order Tracking...';
+      calibDesc = 'Locking onto fundamental operating frequency to track harmonics.';
+    }
+
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center p-8 relative z-10" style={{ background: 'var(--surface-1)', borderLeft: '1px solid var(--surface-border)' }}>
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold" style={{ background: 'var(--nominal-bg)', border: '1px solid var(--nominal-border)', color: 'var(--status-nominal)' }}>
+          <Power className="w-3.5 h-3.5" />
+          POWER ON
+        </div>
+        
+        <div className="relative w-32 h-32 mb-6 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-4 border-dashed animate-[spin_8s_linear_infinite]" style={{ borderColor: 'var(--surface-4)' }} />
+          <div className="absolute inset-0 rounded-full border-4 border-dashed animate-[spin_4s_linear_infinite_reverse]" style={{ borderColor: 'var(--accent)', opacity: 0.3 }} />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center animate-pulse-glow" style={{ background: 'var(--accent-soft)', border: '2px solid var(--accent)' }}>
+            <BrainCircuit className="w-8 h-8" style={{ color: 'var(--accent)' }} />
+          </div>
+        </div>
+        
+        <h2 className="text-sm font-semibold mb-2 text-center" style={{ color: 'var(--text-primary)' }}>{calibPhase}</h2>
+        <p className="text-[11px] text-center px-4 leading-relaxed h-8" style={{ color: 'var(--text-muted)' }}>
+          {calibDesc}
+        </p>
+        
+        <div className="w-full max-w-[200px] h-1.5 rounded-full mt-6 overflow-hidden" style={{ background: 'var(--surface-3)' }}>
+          <div className="h-full rounded-full transition-all duration-1000 ease-linear" style={{ background: 'var(--accent)', width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  }
+
+  // Human-in-the-loop Verification View
+  if (calibrationState === 'completed') {
+    const COMP_LABELS: Record<string, string> = {
+      bearing: 'Rotational Bearing (BPFO)',
+      gear: 'Gear Mesh Matrix',
+      motor: 'Drive Motor (50Hz hum)',
+      belt: 'Drive Belt / Pulley',
+      spindle: 'High-speed Spindle',
+    };
+
+    return (
+      <div className="h-full w-full flex flex-col p-6 relative z-10" style={{ background: 'var(--surface-1)', borderLeft: '1px solid var(--surface-border)' }}>
+        <div className="flex flex-col items-center justify-center mb-6 pt-8 animate-fade-in">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'var(--nominal-bg)' }}>
+            <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--status-nominal)' }} />
+          </div>
+          <h2 className="text-sm font-semibold text-center" style={{ color: 'var(--text-primary)' }}>Calibration Complete</h2>
+          <p className="text-[11px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
+            The AI engine has inferred the following components based on FFT spectral signatures. Please verify before tracking.
+          </p>
+        </div>
+
+        <div className="space-y-2 mb-8 flex-1">
+          {Object.entries(COMP_LABELS).map(([key, label]) => {
+            const isSelected = pendingComponents.includes(key);
+            return (
+              <div 
+                key={key} 
+                onClick={() => {
+                  setPendingComponents(prev => 
+                    isSelected ? prev.filter(k => k !== key) : [...prev, key]
+                  );
+                }}
+                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                style={{ 
+                  background: isSelected ? 'var(--accent-soft)' : 'var(--surface-2)',
+                  border: isSelected ? '1px solid var(--accent)' : '1px solid var(--surface-border)' 
+                }}
+              >
+                <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0" 
+                  style={{ background: isSelected ? 'var(--accent)' : 'transparent', border: isSelected ? 'none' : '1px solid var(--surface-border-light)' }}
+                >
+                  {isSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold" style={{ color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{label}</span>
+                  {isSelected && <span className="text-[9px] font-mono" style={{ color: 'var(--accent)' }}>Signature Locked</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button 
+          onClick={() => onVerifyCalibration(pendingComponents)}
+          className="w-full py-3 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90 mt-auto"
+          style={{ background: 'var(--accent)' }}
+        >
+          Verify & Track Components
+        </button>
+      </div>
+    );
+  }
+
+  // Normal Dashboard View
   return (
     <div
       className="h-full w-full flex flex-col overflow-hidden relative z-10"
@@ -338,7 +456,13 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           {devToolsOpen && (
             <div className="px-4 pb-3 space-y-2 pt-2" style={{ borderTop: '1px solid var(--surface-border)' }}>
               <Toggle checked={simulated} onChange={setSimulated} label="Local Simulation" />
-              {simulated && <Toggle checked={forceFault} onChange={setForceFault} label="Trigger Critical Fault" accent="var(--status-critical)" />}
+              {simulated && (
+                <>
+                  <Toggle checked={forceFault} onChange={setForceFault} label="Trigger Critical Fault" accent="var(--status-critical)" />
+                  <Toggle checked={variableRpm} onChange={setVariableRpm} label="Variable Machine RPM" accent="var(--status-warning)" />
+                  <Toggle checked={tamperedPod} onChange={setTamperedPod} label="Trigger Tamper Event" accent="var(--status-critical)" />
+                </>
+              )}
             </div>
           )}
         </div>

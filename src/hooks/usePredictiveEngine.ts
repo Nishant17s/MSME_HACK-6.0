@@ -79,7 +79,8 @@ const COMPONENT_ACTIONS: Record<keyof ComponentHealth, Record<MaintenanceUrgency
 export function usePredictiveEngine(
   currentData: TelemetryData | undefined,
   history: TelemetryData[],
-  isPowered: boolean
+  isPowered: boolean,
+  discoveredComponents?: string[]
 ) {
   const predictions = useMemo((): ComponentPrediction[] => {
     if (!currentData || !isPowered) {
@@ -95,8 +96,11 @@ export function usePredictiveEngine(
     }
 
     const components = Object.keys(COMPONENT_LABELS) as (keyof ComponentHealth)[];
+    const activeComponents = discoveredComponents 
+      ? components.filter(c => discoveredComponents.includes(c))
+      : components;
 
-    return components.map(comp => {
+    return activeComponents.map(comp => {
       const health = currentData.component_health[comp];
 
       // Calculate wear trend from history
@@ -142,7 +146,7 @@ export function usePredictiveEngine(
 
       return { component: comp, label: COMPONENT_LABELS[comp], health, trend, wearRatePerHour, remainingHours, urgency };
     });
-  }, [currentData, history, isPowered]);
+  }, [currentData, history, isPowered, discoveredComponents]);
 
   // Generate recommendations sorted by urgency
   const recommendations = useMemo((): MaintenanceRecommendation[] => {

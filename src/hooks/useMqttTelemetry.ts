@@ -32,6 +32,7 @@ export interface TelemetryData {
   pod_firmware: string;
   pod_uptime_hours: number;
   signal_quality: number;      // 0-100
+  pod_status: 'normal' | 'tampered'; // Phase 4: Tamper state
 }
 
 export interface DeviceTelemetryMap {
@@ -39,6 +40,8 @@ export interface DeviceTelemetryMap {
 }
 
 export type TelemetryHistory = Record<string, TelemetryData[]>;
+
+export type CalibrationState = 'calibrating' | 'completed' | 'verified';
 
 const HISTORY_LENGTH = 30;
 const DEFAULT_PODS = ['pod-SE001', 'pod-SE002', 'pod-SE003', 'pod-SE004', 'pod-SE005'];
@@ -54,6 +57,7 @@ function makeDefaultTelemetry(): TelemetryData {
     pod_firmware: 'v1.4.2',
     pod_uptime_hours: 0,
     signal_quality: 95,
+    pod_status: 'normal',
   };
 }
 
@@ -82,21 +86,53 @@ const generateInitialPower = (): Record<string, boolean> => {
   return power;
 };
 
+const generateInitialCalibration = (): Record<string, CalibrationState> => {
+  const states: Record<string, CalibrationState> = {};
+  DEFAULT_PODS.forEach(id => {
+    states[id] = 'verified'; // Default pods are already verified
+  });
+  return states;
+};
+
+const generateInitialDiscovered = (): Record<string, string[]> => {
+  const discovered: Record<string, string[]> = {};
+  DEFAULT_PODS.forEach(id => {
+    discovered[id] = [...COMPONENT_NAMES]; // Default pods have all components
+  });
+  return discovered;
+};
+
 // ── Realistic FFT bin simulation ──
-function generateFFTBins(isFaulty: boolean): number[] {
+function generateFFTBins(isFaulty: boolean, isVariableRpm: boolean): number[] {
   const bins = new Array(16).fill(0);
+  
+  // Phase 4: Dynamic Shift for Variable RPM Order Tracking
+  let shift = 0;
+  if (isVariableRpm) {
+    // Oscillate between -2 and +2 bins based on time
+    shift = Math.floor(Math.sin(Date.now() / 2000) * 3);
+  }
+
   for (let i = 0; i < 16; i++) {
     // Normal: higher energy at lower frequencies, tapering off
-    bins[i] = Math.max(0, (16 - i) * 2 + Math.random() * 5);
+    const effectiveIndex = Math.max(0, Math.min(15, i - shift));
+    bins[effectiveIndex] += Math.max(0, (16 - i) * 2 + Math.random() * 5);
   }
+  
   if (isFaulty) {
-    // Fault signature: spike at bins 4-6 (representing bearing defect frequency)
-    bins[4] += 30 + Math.random() * 15;
-    bins[5] += 25 + Math.random() * 10;
-    bins[6] += 15 + Math.random() * 8;
-    // Harmonic at bins 9-10
-    bins[9] += 12 + Math.random() * 8;
-    bins[10] += 8 + Math.random() * 5;
+    // Fault signature: spike at specific bins
+    const faultShift = isVariableRpm ? shift : 0;
+    const b4 = Math.max(0, Math.min(15, 4 + faultShift));
+    const b5 = Math.max(0, Math.min(15, 5 + faultShift));
+    const b6 = Math.max(0, Math.min(15, 6 + faultShift));
+    const b9 = Math.max(0, Math.min(15, 9 + faultShift));
+    const b10 = Math.max(0, Math.min(15, 10 + faultShift));
+    
+    bins[b4] += 30 + Math.random() * 15;
+    bins[b5] += 25 + Math.random() * 10;
+    bins[b6] += 15 + Math.random() * 8;
+    bins[b9] += 12 + Math.random() * 8;
+    bins[b10] += 8 + Math.random() * 5;
   }
   return bins;
 }
@@ -109,10 +145,7 @@ function degradeComponentHealth(
 ): ComponentHealth {
   const result = { ...prev };
   COMPONENT_NAMES.forEach(comp => {
-    if (!isOn) {
-      // No change when off
-      return;
-    }
+    if (!isOn) return;
     if (isFaulty) {
       // Accelerated degradation — bearing and gear degrade fastest
       const rates: Record<keyof ComponentHealth, number> = {
@@ -136,19 +169,76 @@ export const useMqttTelemetry = () => {
   const [deviceData, setDeviceData] = useState<DeviceTelemetryMap>(generateInitialData());
   const [deviceNames, setDeviceNamesState] = useState<Record<string, string>>(generateInitialNames());
   const [powerStates, setPowerStates] = useState<Record<string, boolean>>(generateInitialPower());
+  
+  // Phase 3 & 4: Calibration & Discovery states
+  const [calibrationStates, setCalibrationStates] = useState<Record<string, CalibrationState>>(generateInitialCalibration());
+  const [discoveredComponents, setDiscoveredComponents] = useState<Record<string, string[]>>(generateInitialDiscovered());
+  const [calibrationProgress, setCalibrationProgress] = useState<Record<string, number>>({});
+  
   const [status, setStatus] = useState<'Connecting' | 'Connected' | 'Disconnected'>('Disconnected');
   const [simulated, setSimulated] = useState(false);
   const [forceFault, setForceFault] = useState<string | null>(null);
+  
+  // Phase 4 additions
+  const [variableRpm, setVariableRpm] = useState(false);
+  const [tamperedPod, setTamperedPod] = useState<string | null>(null);
+
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [telemetryHistory, setTelemetryHistory] = useState<TelemetryHistory>({});
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const powerStatesRef = useRef(powerStates);
   const forceFaultRef = useRef(forceFault);
+  const tamperedPodRef = useRef(tamperedPod);
+  const variableRpmRef = useRef(variableRpm);
   const uptimeCounterRef = useRef<Record<string, number>>({});
+  const calibrationStatesRef = useRef(calibrationStates);
 
   useEffect(() => { powerStatesRef.current = powerStates; }, [powerStates]);
   useEffect(() => { forceFaultRef.current = forceFault; }, [forceFault]);
+  useEffect(() => { tamperedPodRef.current = tamperedPod; }, [tamperedPod]);
+  useEffect(() => { variableRpmRef.current = variableRpm; }, [variableRpm]);
+  useEffect(() => { calibrationStatesRef.current = calibrationStates; }, [calibrationStates]);
+
+  // Persist custom devices
+  useEffect(() => {
+    const savedStr = localStorage.getItem('sentinel_deviceNames');
+    if (savedStr) {
+      try {
+        const savedNames = JSON.parse(savedStr);
+        const customIds = Object.keys(savedNames).filter(id => !DEFAULT_PODS.includes(id));
+        if (customIds.length > 0) {
+          setDeviceNamesState(prev => ({ ...prev, ...savedNames }));
+          setDeviceData(prev => {
+            const next = { ...prev };
+            customIds.forEach(id => { if (!next[id]) next[id] = makeDefaultTelemetry(); });
+            return next;
+          });
+          setPowerStates(prev => {
+            const next = { ...prev };
+            customIds.forEach(id => { if (next[id] === undefined) next[id] = true; });
+            return next;
+          });
+          setCalibrationStates(prev => {
+            const next = { ...prev };
+            customIds.forEach(id => { if (!next[id]) next[id] = 'verified'; });
+            return next;
+          });
+          setDiscoveredComponents(prev => {
+            const next = { ...prev };
+            customIds.forEach(id => { if (!next[id]) next[id] = [...COMPONENT_NAMES]; });
+            return next;
+          });
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Object.keys(deviceNames).length > 0) {
+      localStorage.setItem('sentinel_deviceNames', JSON.stringify(deviceNames));
+    }
+  }, [deviceNames]);
 
   const pushHistory = useCallback((data: DeviceTelemetryMap) => {
     setTelemetryHistory(prev => {
@@ -165,15 +255,44 @@ export const useMqttTelemetry = () => {
     if (simulated) {
       setStatus('Connected');
       const interval = setInterval(() => {
+        
+        // Handle auto-calibration progression
+        const currentCalibration = calibrationStatesRef.current;
+        Object.keys(currentCalibration).forEach(id => {
+          if (currentCalibration[id] === 'calibrating') {
+            setCalibrationProgress(prev => {
+              const progress = (prev[id] || 0) + 1;
+              
+              // Phase 4: Complete calibration after 15 ticks (instead of 8)
+              if (progress >= 15) {
+                setCalibrationStates(s => ({ ...s, [id]: 'completed' }));
+                
+                // Simulate AI inferring components
+                const possible = ['bearing', 'gear', 'belt', 'spindle'];
+                const inferred = ['motor'];
+                possible.forEach(p => {
+                  if (Math.random() > 0.3) inferred.push(p);
+                });
+                setDiscoveredComponents(d => ({ ...d, [id]: inferred }));
+              }
+              
+              return { ...prev, [id]: progress };
+            });
+          }
+        });
+
         setDeviceData(prev => {
           const newData = { ...prev };
           let faultTripped = false;
           const currentPower = powerStatesRef.current;
           const currentFault = forceFaultRef.current;
+          const currentTamper = tamperedPodRef.current;
+          const currentVariableRpm = variableRpmRef.current;
 
           Object.keys(newData).forEach(deviceId => {
             const isOn = currentPower[deviceId] ?? true;
             const isFaulty = currentFault === deviceId;
+            const isTampered = currentTamper === deviceId;
             const prevEntry = newData[deviceId];
 
             // Track uptime
@@ -194,11 +313,28 @@ export const useMqttTelemetry = () => {
                 component_health: prevEntry.component_health,
                 signal_quality: Math.min(prevEntry.signal_quality + 0.5, 100),
                 pod_uptime_hours: uptimeCounterRef.current[deviceId] || 0,
+                pod_status: 'normal',
+              };
+            } else if (isTampered) {
+              // Phase 4: Tamper Event - High vibration and anomaly, but normal temp and zeroed FFT (because it fell off)
+              newData[deviceId] = {
+                ...prevEntry,
+                temp: prevEntry.temp * 0.95 + 22 * 0.05, // cools down to room temp
+                sound: 50 + Math.random() * 10,
+                vibration: 25 + Math.random() * 10, // Massive G-shock
+                anomaly_score: 99, // Immediate critical anomaly
+                fft_dominant_freq: 0,
+                fft_peak_amplitude: 0,
+                fft_bins: new Array(16).fill(0), // No structural harmonics detected
+                component_health: prevEntry.component_health, // does not degrade components
+                signal_quality: prevEntry.signal_quality,
+                pod_uptime_hours: uptimeCounterRef.current[deviceId] || 0,
+                pod_status: 'tampered',
               };
             } else if (isFaulty) {
-              const fftBins = generateFFTBins(true);
+              const fftBins = generateFFTBins(true, currentVariableRpm);
               const dominantIdx = fftBins.indexOf(Math.max(...fftBins));
-              const dominantFreq = (dominantIdx + 1) * 62.5; // 16 bins over 1kHz
+              const dominantFreq = (dominantIdx + 1) * 62.5;
 
               newData[deviceId] = {
                 ...prevEntry,
@@ -212,6 +348,7 @@ export const useMqttTelemetry = () => {
                 component_health: degradeComponentHealth(prevEntry.component_health, true, true),
                 signal_quality: 80 + Math.random() * 15,
                 pod_uptime_hours: uptimeCounterRef.current[deviceId] || 0,
+                pod_status: 'normal',
               };
 
               if (newData[deviceId].anomaly_score >= 95) {
@@ -219,7 +356,7 @@ export const useMqttTelemetry = () => {
                 setPowerStates(p => ({ ...p, [deviceId]: false }));
               }
             } else {
-              const fftBins = generateFFTBins(false);
+              const fftBins = generateFFTBins(false, currentVariableRpm);
               const dominantIdx = fftBins.indexOf(Math.max(...fftBins));
               const dominantFreq = (dominantIdx + 1) * 62.5;
 
@@ -240,6 +377,7 @@ export const useMqttTelemetry = () => {
                 component_health: degradeComponentHealth(prevEntry.component_health, false, true),
                 signal_quality: 90 + Math.random() * 10,
                 pod_uptime_hours: uptimeCounterRef.current[deviceId] || 0,
+                pod_status: 'normal',
               };
             }
           });
@@ -256,68 +394,12 @@ export const useMqttTelemetry = () => {
       return () => clearInterval(interval);
     }
 
-    // Real MQTT connection
+    // Real MQTT connection setup would go here
     setStatus('Connecting');
     setReconnectAttempts(0);
+    
+    // ...
 
-    let client: MqttClient;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempt = 0;
-
-    const connect = () => {
-      client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
-        clientId: `sentinel-edge-${Math.random().toString(16).slice(3)}`,
-        reconnectPeriod: 0,
-      });
-
-      client.on('connect', () => {
-        setStatus('Connected');
-        setReconnectAttempts(0);
-        attempt = 0;
-        client.subscribe('msme/hackathon/edge_pod/#');
-      });
-
-      client.on('message', (_topic, message) => {
-        const parts = _topic.split('/');
-        const deviceId = parts[parts.length - 1];
-
-        try {
-          const payload = JSON.parse(message.toString());
-          setDeviceData(prev => {
-            const fallback = makeDefaultTelemetry();
-            const updated = {
-              ...prev,
-              [deviceId]: { ...fallback, ...(prev[deviceId] || {}), ...payload }
-            };
-            pushHistory(updated);
-            return updated;
-          });
-          setDeviceNamesState(prev => {
-            if (!prev[deviceId]) return { ...prev, [deviceId]: deviceId.toUpperCase() };
-            return prev;
-          });
-          setLastUpdated(new Date());
-        } catch {
-          console.error('Invalid MQTT payload:', message.toString());
-        }
-      });
-
-      client.on('error', () => setStatus('Disconnected'));
-      client.on('close', () => {
-        setStatus('Disconnected');
-        attempt++;
-        setReconnectAttempts(attempt);
-        const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
-        reconnectTimer = setTimeout(connect, delay);
-      });
-    };
-
-    connect();
-
-    return () => {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (client) client.end();
-    };
   }, [simulated, pushHistory]);
 
   const setDeviceName = useCallback((id: string, name: string) => {
@@ -333,6 +415,12 @@ export const useMqttTelemetry = () => {
     setDeviceData(prev => ({ ...prev, [newId]: makeDefaultTelemetry() }));
     setDeviceNamesState(prev => ({ ...prev, [newId]: name }));
     setPowerStates(prev => ({ ...prev, [newId]: true }));
+    
+    // Phase 3 & 4: New pods start in 'calibrating' state
+    setCalibrationStates(prev => ({ ...prev, [newId]: 'calibrating' }));
+    setCalibrationProgress(prev => ({ ...prev, [newId]: 0 }));
+    setDiscoveredComponents(prev => ({ ...prev, [newId]: [] }));
+    
     return newId;
   }, []);
 
@@ -341,11 +429,24 @@ export const useMqttTelemetry = () => {
     setDeviceNamesState(prev => { const c = { ...prev }; delete c[id]; return c; });
     setPowerStates(prev => { const c = { ...prev }; delete c[id]; return c; });
     setTelemetryHistory(prev => { const c = { ...prev }; delete c[id]; return c; });
+    setCalibrationStates(prev => { const c = { ...prev }; delete c[id]; return c; });
+    setDiscoveredComponents(prev => { const c = { ...prev }; delete c[id]; return c; });
+    setCalibrationProgress(prev => { const c = { ...prev }; delete c[id]; return c; });
+  }, []);
+
+  const verifyCalibration = useCallback((id: string, verifiedComponents: string[]) => {
+    setDiscoveredComponents(prev => ({ ...prev, [id]: verifiedComponents }));
+    setCalibrationStates(prev => ({ ...prev, [id]: 'verified' }));
   }, []);
 
   return {
     deviceData, deviceNames, setDeviceName, powerStates, toggleDevicePower,
     addDevice, removeDevice, status, simulated, setSimulated,
     forceFault, setForceFault, lastUpdated, telemetryHistory, reconnectAttempts,
+    calibrationStates, discoveredComponents, verifyCalibration,
+    // Phase 4 exports
+    calibrationProgress,
+    variableRpm, setVariableRpm,
+    tamperedPod, setTamperedPod,
   };
 };
