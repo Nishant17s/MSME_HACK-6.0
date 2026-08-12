@@ -1,18 +1,22 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF, MeshWobbleMaterial } from '@react-three/drei';
+import { useGLTF, MeshWobbleMaterial, Bounds } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface MachineModelProps {
   anomalyScore: number;
+  modelUrl: string;
 }
 
-export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore }) => {
-  const { scene } = useGLTF('/machine.glb');
+export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelUrl }) => {
+  const { scene } = useGLTF(modelUrl);
   const isCritical = anomalyScore >= 80;
   
   const groupRef = useRef<THREE.Group>(null);
   const sphereRef = useRef<THREE.Mesh>(null);
+
+  // Clone the scene so we can reuse the same GLTF across unmounts/remounts easily without messing up the cache
+  const clonedScene = React.useMemo(() => scene.clone(), [scene]);
 
   useFrame((state) => {
     if (groupRef.current) {
@@ -33,32 +37,25 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore }) => {
 
   return (
     <group ref={groupRef} dispose={null}>
-      {/* We center and scale the sample glTF Box model */}
-      <primitive object={scene} scale={2} position={[0, -1, 0]} />
-      
-      {/* Additional procedurally generated machine parts attached to the box to look like a pod */}
-      <mesh position={[0, 1.5, 0]}>
-        <cylinderGeometry args={[0.5, 0.5, 1, 32]} />
-        <meshStandardMaterial color={isCritical ? "#442222" : "#334455"} metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Visual Trigger overlay for E-STOP */}
-      {isCritical && (
-        <mesh ref={sphereRef} position={[0, 1.5, 0]}>
-          <sphereGeometry args={[0.6, 32, 32]} />
-          <MeshWobbleMaterial 
-            color="#ff0000" 
-            emissive="#ff0000" 
-            emissiveIntensity={4} 
-            transparent 
-            opacity={0.6} 
-            factor={1} 
-            speed={10} 
-          />
-        </mesh>
-      )}
+      <Bounds fit clip observe margin={1.2}>
+        <primitive object={clonedScene} />
+        
+        {/* Visual Trigger overlay for E-STOP positioned dynamically inside the bounds */}
+        {isCritical && (
+          <mesh ref={sphereRef} position={[0, 0, 0]}>
+            <sphereGeometry args={[1, 32, 32]} />
+            <MeshWobbleMaterial 
+              color="#ff0000" 
+              emissive="#ff0000" 
+              emissiveIntensity={4} 
+              transparent 
+              opacity={0.6} 
+              factor={1} 
+              speed={10} 
+            />
+          </mesh>
+        )}
+      </Bounds>
     </group>
   );
 };
-
-useGLTF.preload('/machine.glb');

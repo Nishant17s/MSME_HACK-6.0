@@ -7,9 +7,10 @@ import { MachineModel } from './MachineModel';
 
 interface DigitalTwinCanvasProps {
   anomalyScore: number;
+  modelUrl: string;
 }
 
-export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ anomalyScore }) => {
+export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ anomalyScore, modelUrl }) => {
   return (
     <div className="w-full h-full bg-gradient-to-b from-slate-900 to-black relative">
       <Canvas camera={{ position: [5, 5, 5], fov: 45 }}>
@@ -20,7 +21,7 @@ export const DigitalTwinCanvas: React.FC<DigitalTwinCanvasProps> = ({ anomalySco
         <pointLight position={[-10, -10, -10]} intensity={0.5} />
         
         <Suspense fallback={<Loader />}>
-          <MachineModel anomalyScore={anomalyScore} />
+          <MachineModel anomalyScore={anomalyScore} modelUrl={modelUrl} />
           <Environment preset="city" />
           <ContactShadows position={[0, -1.5, 0]} opacity={0.4} scale={10} blur={2} far={4} />
         </Suspense>

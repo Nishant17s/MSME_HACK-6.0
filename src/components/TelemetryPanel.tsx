@@ -2,6 +2,7 @@ import React from 'react';
 import { EStopBanner } from './EStopBanner';
 import { TelemetryData } from '../hooks/useMqttTelemetry';
 import { Activity, Thermometer, Volume2, Wifi, WifiOff } from 'lucide-react';
+import { ModelSelector } from './ModelSelector';
 
 interface TelemetryPanelProps {
   data: TelemetryData;
@@ -10,6 +11,8 @@ interface TelemetryPanelProps {
   setSimulated: (val: boolean) => void;
   forceFault: boolean;
   setForceFault: (val: boolean) => void;
+  activeModelId: string;
+  onSelectModel: (id: string) => void;
 }
 
 const MetricCard = ({ title, value, unit, icon, critical }: { title: string, value: string | number, unit: string, icon: React.ReactNode, critical?: boolean }) => (
@@ -31,7 +34,9 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   simulated,
   setSimulated,
   forceFault,
-  setForceFault
+  setForceFault,
+  activeModelId,
+  onSelectModel
 }) => {
   return (
     <div className="h-full w-full p-6 flex flex-col space-y-6 overflow-y-auto custom-scrollbar border-l border-slate-800">
@@ -45,6 +50,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           <span className="text-xs font-medium text-slate-300">{status}</span>
         </div>
       </div>
+
+      <ModelSelector activeModelId={activeModelId} onSelectModel={onSelectModel} />
 
       <EStopBanner anomalyScore={data.anomaly_score} />
 
