@@ -90,8 +90,9 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
         />
       </div>
 
-      <div className="mt-8 pt-6 border-t border-slate-800">
-        <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Dev Controls</h3>
+      {/* Dev Controls */}
+      <div className="mt-auto pt-4 pb-12 border-t border-slate-800">
+        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Dev Controls</h3>
         <div className="flex flex-col space-y-3">
           <label className="flex items-center space-x-3 cursor-pointer">
             <input 

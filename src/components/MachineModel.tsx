@@ -37,7 +37,7 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelU
 
   return (
     <group ref={groupRef} dispose={null}>
-      <Bounds fit clip observe margin={1.2}>
+      <Bounds fit margin={1.5}>
         <primitive object={clonedScene} />
         
         {/* Visual Trigger overlay for E-STOP positioned dynamically inside the bounds */}
