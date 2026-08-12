@@ -12,7 +12,7 @@ interface TelemetryPanelProps {
   forceFault: boolean;
   setForceFault: (val: boolean) => void;
   activeModelId: string;
-  onSelectModel: (id: string) => void;
+  onSelectModel: (id: string, url?: string, name?: string) => void;
   isPowered: boolean;
   onTogglePower: () => void;
 }

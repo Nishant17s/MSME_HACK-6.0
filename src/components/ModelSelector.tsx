@@ -17,30 +17,43 @@ export const availableModels: ModelOption[] = [
 
 interface ModelSelectorProps {
   activeModelId: string;
-  onSelectModel: (id: string, url?: string) => void;
+  onSelectModel: (id: string, url?: string, name?: string) => void;
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onSelectModel }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCollapsed, setIsCollapsed] = useState(activeModelId === 'custom-upload');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Create a temporary object URL that works immediately in the browser
+      const suggestedName = file.name.replace(/\.(glb|gltf)$/i, '');
+      const machineName = window.prompt("Enter a name for this custom machine:", suggestedName);
+      
       const objectUrl = URL.createObjectURL(file);
-      onSelectModel('custom-upload', objectUrl);
+      onSelectModel('custom-upload', objectUrl, machineName || suggestedName);
+      setIsCollapsed(true);
     }
   };
 
   return (
     <div className="w-full p-4 rounded-xl border border-slate-700 bg-slate-800/50 backdrop-blur-md flex flex-col space-y-3">
-      <div className="flex items-center space-x-2 text-slate-300">
-        <Box className="w-5 h-5" />
-        <h3 className="text-sm font-semibold uppercase tracking-wider">3D Asset Selection</h3>
+      <div 
+        className="flex items-center justify-between text-slate-300 cursor-pointer hover:text-slate-100 transition-colors"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <div className="flex items-center space-x-2">
+          <Box className="w-5 h-5" />
+          <h3 className="text-sm font-semibold uppercase tracking-wider">3D Asset Selection</h3>
+        </div>
+        <span className="text-xs font-mono bg-slate-900/50 px-2 py-1 rounded text-slate-400">
+          {isCollapsed ? 'EXPAND' : 'COLLAPSE'}
+        </span>
       </div>
       
-      <div className="flex flex-col space-y-2">
-        {availableModels.map((model) => (
+      {!isCollapsed && (
+        <div className="flex flex-col space-y-2 mt-2 border-t border-slate-700/50 pt-3">
+          {availableModels.map((model) => (
           <button
             key={model.id}
             onClick={() => onSelectModel(model.id, model.url)}
@@ -66,14 +79,15 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModelId, onS
           <span>Upload Custom GLB</span>
           <Upload className="w-4 h-4" />
         </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileUpload} 
-          accept=".glb,.gltf" 
-          style={{ display: 'none' }}
-        />
-      </div>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            accept=".glb,.gltf" 
+            style={{ display: 'none' }}
+          />
+        </div>
+      )}
     </div>
   );
 };

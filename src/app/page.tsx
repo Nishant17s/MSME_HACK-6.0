@@ -31,11 +31,14 @@ export default function Dashboard() {
   // State for which 3D model is active for each device
   const [deviceModels, setDeviceModels] = useState<Record<string, { id: string, url?: string }>>({});
   
-  const handleModelSelect = (id: string, url?: string) => {
+  const handleModelSelect = (id: string, url?: string, name?: string) => {
     setDeviceModels(prev => ({
       ...prev,
       [activeDeviceId]: { id, url }
     }));
+    if (name) {
+      setDeviceName(activeDeviceId, name);
+    }
   };
 
   const currentModelSetting = deviceModels[activeDeviceId] || { id: availableModels[0].id };
