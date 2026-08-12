@@ -12,7 +12,7 @@ interface DeviceSidebarProps {
 
 export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, activeDeviceId, onSelectDevice }) => {
   return (
-    <aside className="w-[280px] h-full bg-slate-900/95 backdrop-blur-md border-r border-slate-800/80 flex flex-col shadow-2xl relative z-10">
+    <aside className="w-[280px] min-w-[280px] h-full bg-slate-900/95 backdrop-blur-md border-r border-slate-800/80 flex flex-col shadow-2xl relative z-10 flex-shrink-0">
       <div className="p-5 border-b border-slate-800/50 bg-slate-900/40">
         <h2 className="text-slate-400 text-[10px] font-bold tracking-[0.2em] uppercase">Connected Nodes</h2>
         <p className="text-xs text-slate-500 mt-1">Select a device to monitor telemetry</p>

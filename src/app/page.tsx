@@ -41,7 +41,7 @@ export default function Dashboard() {
       {/* 1. Top Navigation Bar */}
       <TopBar />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 w-full h-full overflow-hidden relative">
         
         {/* 2. Left Sidebar (Device List) */}
         <DeviceSidebar 
@@ -51,12 +51,12 @@ export default function Dashboard() {
         />
 
         {/* 3. Main 3D Canvas (Center) */}
-        <section className="flex-1 relative">
+        <section className="flex-1 w-full h-full relative z-0">
           <DigitalTwinCanvas anomalyScore={activeDeviceTelemetry.anomaly_score} modelUrl={activeModelUrl} />
         </section>
 
         {/* 4. Telemetry Dashboard (Right Sidebar) */}
-        <section className="w-[350px] h-full z-10 shadow-2xl bg-slate-900/50">
+        <section className="w-[350px] min-w-[350px] h-full z-10 shadow-2xl bg-slate-900/50 flex-shrink-0">
           <TelemetryPanel 
             data={activeDeviceTelemetry} 
             status={status} 
