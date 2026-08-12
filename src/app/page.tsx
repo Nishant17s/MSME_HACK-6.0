@@ -10,7 +10,7 @@ import { StatusBar } from '../components/StatusBar';
 import { DeviceSidebar } from '../components/DeviceSidebar';
 
 export default function Dashboard() {
-  const { deviceData, status, simulated, setSimulated, forceFault, setForceFault, lastUpdated } = useMqttTelemetry();
+  const { deviceData, deviceNames, setDeviceName, status, simulated, setSimulated, forceFault, setForceFault, lastUpdated } = useMqttTelemetry();
   
   // State for which device is selected in the sidebar
   const [activeDeviceId, setActiveDeviceId] = useState<string>('device-1');
@@ -46,6 +46,8 @@ export default function Dashboard() {
         {/* 2. Left Sidebar (Device List) */}
         <DeviceSidebar 
           deviceData={deviceData} 
+          deviceNames={deviceNames}
+          setDeviceName={setDeviceName}
           activeDeviceId={activeDeviceId} 
           onSelectDevice={setActiveDeviceId} 
         />

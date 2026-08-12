@@ -27,8 +27,17 @@ const generateInitialData = (): DeviceTelemetryMap => {
   return data;
 };
 
+const generateInitialNames = (): Record<string, string> => {
+  const names: Record<string, string> = {};
+  DEFAULT_DEVICES.forEach(id => {
+    names[id] = id.toUpperCase();
+  });
+  return names;
+};
+
 export const useMqttTelemetry = () => {
   const [deviceData, setDeviceData] = useState<DeviceTelemetryMap>(generateInitialData());
+  const [deviceNames, setDeviceNames] = useState<Record<string, string>>(generateInitialNames());
   const [status, setStatus] = useState<'Connecting' | 'Connected' | 'Disconnected'>('Disconnected');
   const [simulated, setSimulated] = useState(false);
   const [forceFault, setForceFault] = useState<string | null>(null); // Which device is faulting
@@ -79,6 +88,12 @@ export const useMqttTelemetry = () => {
           ...prev,
           [deviceId]: { ...(prev[deviceId] || generateInitialData()['device-1']), ...payload }
         }));
+        setDeviceNames(prev => {
+          if (!prev[deviceId]) {
+            return { ...prev, [deviceId]: deviceId.toUpperCase() };
+          }
+          return prev;
+        });
         setLastUpdated(new Date());
       } catch (e) {
         console.error('Invalid payload:', message.toString());
@@ -91,8 +106,14 @@ export const useMqttTelemetry = () => {
     return () => client.end();
   }, [simulated, forceFault]);
 
+  const setDeviceName = (id: string, name: string) => {
+    setDeviceNames(prev => ({ ...prev, [id]: name }));
+  };
+
   return { 
     deviceData, 
+    deviceNames,
+    setDeviceName,
     status, 
     simulated, 
     setSimulated, 

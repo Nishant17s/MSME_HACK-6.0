@@ -13,7 +13,8 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelU
   const isCritical = anomalyScore >= 80;
   
   const groupRef = useRef<THREE.Group>(null);
-  const sphereRef = useRef<THREE.Mesh>(null);
+  const beaconRef = useRef<THREE.Mesh>(null);
+  const lightRef = useRef<THREE.PointLight>(null);
 
   // Clone the scene so we can reuse the same GLTF across unmounts/remounts easily without messing up the cache
   const clonedScene = React.useMemo(() => scene.clone(), [scene]);
@@ -29,9 +30,17 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelU
       groupRef.current.position.z = Math.cos(state.clock.elapsedTime * 50) * vib;
     }
     
-    if (sphereRef.current) {
-      const scale = 1.2 + Math.sin(state.clock.elapsedTime * 10) * 0.2;
-      sphereRef.current.scale.set(scale, scale, scale);
+    if (isCritical) {
+      const flash = Math.sin(state.clock.elapsedTime * 15) * 0.5 + 0.5; // 0 to 1 pulsing
+      if (beaconRef.current) {
+        // Beacon rotation and pulsing emissive
+        beaconRef.current.rotation.y = state.clock.elapsedTime * 10;
+        const material = beaconRef.current.material as THREE.MeshStandardMaterial;
+        material.emissiveIntensity = 2 + flash * 5;
+      }
+      if (lightRef.current) {
+        lightRef.current.intensity = 20 * flash;
+      }
     }
   });
 
@@ -40,20 +49,26 @@ export const MachineModel: React.FC<MachineModelProps> = ({ anomalyScore, modelU
       <Bounds fit margin={1.5}>
         <primitive object={clonedScene} />
         
-        {/* Visual Trigger overlay for E-STOP positioned dynamically inside the bounds */}
+        {/* Cool Siren Beacon for E-STOP */}
         {isCritical && (
-          <mesh ref={sphereRef} position={[0, 0, 0]}>
-            <sphereGeometry args={[1, 32, 32]} />
-            <MeshWobbleMaterial 
-              color="#ff0000" 
-              emissive="#ff0000" 
-              emissiveIntensity={4} 
-              transparent 
-              opacity={0.6} 
-              factor={1} 
-              speed={10} 
-            />
-          </mesh>
+          <group position={[0, 2, 0]}>
+            <pointLight ref={lightRef} color="#ff0000" distance={10} intensity={20} />
+            <mesh ref={beaconRef} position={[0, 0, 0]}>
+              <cylinderGeometry args={[0.2, 0.2, 0.3, 16]} />
+              <meshStandardMaterial 
+                color="#ff0000" 
+                emissive="#ff0000" 
+                emissiveIntensity={5} 
+                transparent 
+                opacity={0.9} 
+              />
+            </mesh>
+            {/* Base for the beacon */}
+            <mesh position={[0, -0.2, 0]}>
+              <cylinderGeometry args={[0.25, 0.25, 0.1, 16]} />
+              <meshStandardMaterial color="#333333" />
+            </mesh>
+          </group>
         )}
       </Bounds>
     </group>

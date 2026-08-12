@@ -1,16 +1,35 @@
 'use client';
 
-import React from 'react';
-import { Server, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Server, AlertCircle, CheckCircle2, ChevronRight, Edit2, Check } from 'lucide-react';
 import { DeviceTelemetryMap } from '../hooks/useMqttTelemetry';
 
 interface DeviceSidebarProps {
   deviceData: DeviceTelemetryMap;
+  deviceNames: Record<string, string>;
+  setDeviceName: (id: string, name: string) => void;
   activeDeviceId: string;
   onSelectDevice: (id: string) => void;
 }
 
-export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, activeDeviceId, onSelectDevice }) => {
+export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, deviceNames, setDeviceName, activeDeviceId, onSelectDevice }) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const handleEdit = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(id);
+    setEditValue(deviceNames[id] || id.toUpperCase());
+  };
+
+  const handleSave = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (editValue.trim()) {
+      setDeviceName(id, editValue.trim());
+    }
+    setEditingId(null);
+  };
+
   return (
     <aside className="w-[280px] min-w-[280px] h-full bg-slate-900/95 backdrop-blur-md border-r border-slate-800/80 flex flex-col shadow-2xl relative z-10 flex-shrink-0">
       <div className="p-5 border-b border-slate-800/50 bg-slate-900/40">
@@ -38,9 +57,31 @@ export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, active
                   <Server className={`w-4 h-4 ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
                 </div>
                 <div className="flex flex-col">
-                  <span className={`font-semibold text-sm ${isActive ? 'text-blue-100' : 'text-slate-300 group-hover:text-white'}`}>
-                    {deviceId.toUpperCase()}
-                  </span>
+                  {editingId === deviceId ? (
+                    <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="text" 
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSave(deviceId)}
+                        onBlur={() => handleSave(deviceId)}
+                        className="bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-sm font-semibold text-white w-24 outline-none focus:border-blue-500"
+                      />
+                      <button onClick={(e) => handleSave(deviceId, e)} className="p-1 hover:bg-slate-700 rounded text-emerald-400">
+                        <Check className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <span className={`font-semibold text-sm ${isActive ? 'text-blue-100' : 'text-slate-300 group-hover:text-white'}`}>
+                        {deviceNames[deviceId] || deviceId.toUpperCase()}
+                      </span>
+                      <button onClick={(e) => handleEdit(deviceId, e)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 transition-opacity">
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                   <span className="text-[10px] font-mono text-slate-500 mt-0.5">
                     {isCritical ? 'CRITICAL STATE' : 'ONLINE'}
                   </span>
