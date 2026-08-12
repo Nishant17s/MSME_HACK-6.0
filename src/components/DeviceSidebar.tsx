@@ -11,9 +11,10 @@ interface DeviceSidebarProps {
   powerStates: Record<string, boolean>;
   activeDeviceId: string;
   onSelectDevice: (id: string) => void;
+  onAddDevice: () => void;
 }
 
-export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, deviceNames, setDeviceName, powerStates, activeDeviceId, onSelectDevice }) => {
+export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, deviceNames, setDeviceName, powerStates, activeDeviceId, onSelectDevice, onAddDevice }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -104,6 +105,17 @@ export const DeviceSidebar: React.FC<DeviceSidebarProps> = ({ deviceData, device
             </button>
           );
         })}
+      </div>
+      
+      {/* Add Device Button */}
+      <div className="p-4 border-t border-slate-800/80 bg-slate-900/60 mt-auto">
+        <button
+          onClick={onAddDevice}
+          className="w-full py-2.5 rounded-lg border border-dashed border-slate-600 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-colors text-sm font-semibold flex items-center justify-center space-x-2"
+        >
+          <span className="text-lg leading-none">+</span>
+          <span>Add New Device</span>
+        </button>
       </div>
     </aside>
   );

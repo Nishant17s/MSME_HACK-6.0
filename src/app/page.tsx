@@ -16,6 +16,7 @@ export default function Dashboard() {
     setDeviceName, 
     powerStates,
     toggleDevicePower,
+    addDevice,
     status, 
     simulated, 
     setSimulated, 
@@ -65,6 +66,7 @@ export default function Dashboard() {
           powerStates={powerStates}
           activeDeviceId={activeDeviceId} 
           onSelectDevice={setActiveDeviceId} 
+          onAddDevice={addDevice}
         />
 
         {/* 3. Main 3D Canvas (Center) */}
